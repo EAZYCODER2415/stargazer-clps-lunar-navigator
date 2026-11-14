@@ -13,7 +13,7 @@ This list extracts the proposed features from [the non-technical needs research]
 
 ## P1 — Recommended improvements
 
-- [ ] **Two-site comparison mode** — Let users compare two curated sites at the same time, with prompts that help them notice differences in sunlight, shadows, and Earth visibility.
+- [ ] **Three-site comparison mode** — Compare all three curated candidate sites (Malapert Mountain / Massif, Shackleton Crater, and Wiechert Circle) together, with prompts that help users notice differences in sunlight, shadows, and Earth visibility. The current comparison panel displays three entries, but its hard-coded list can duplicate a site depending on which site is selected; ensure each candidate appears exactly once.
 - [ ] **Classroom-safe mode** — Offer a predictable set of sites, time ranges, and camera presets while hiding advanced controls.
 - [ ] **Accessibility improvements** — Support keyboard use, descriptive text/captions, and clear color contrast for visual layers.
 - [ ] **Site story cards** — Explain why each featured site is interesting and how it relates to lunar exploration, with links to reliable mission information.
@@ -26,4 +26,4 @@ This list extracts the proposed features from [the non-technical needs research]
 
 ## Priority note
 
-The research's feature recommendation table labels two-site comparison P0, while its developer handover places it under P1. This list uses P1 to match the handover section and keeps the discrepancy visible for the team to resolve.
+The research's feature recommendation table and developer handover both describe comparison of two sites, but assign different priorities (P0 and P1). This project has three candidate sites, so this checklist expands the recommendation to compare all three; P1 follows the developer handover pending a team decision.
