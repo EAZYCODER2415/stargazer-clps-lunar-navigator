@@ -52,8 +52,11 @@ function interpolate(samples, time) {
   const lower = samples[upperIndex - 1];
   const upper = samples[upperIndex];
   const ratio = (timestamp - lower.time.getTime()) / (upper.time.getTime() - lower.time.getTime());
+  // Azimuth is a compass angle, so go the short way round: between 359.9° and 0.1° the body
+  // moves 0.2° through north, not 359.8° back through south.
+  const turn = ((upper.azimuth - lower.azimuth + 540) % 360) - 180;
   return {
-    azimuth: lower.azimuth + (upper.azimuth - lower.azimuth) * ratio,
+    azimuth: (((lower.azimuth + turn * ratio) % 360) + 360) % 360,
     elevation: lower.elevation + (upper.elevation - lower.elevation) * ratio
   };
 }
