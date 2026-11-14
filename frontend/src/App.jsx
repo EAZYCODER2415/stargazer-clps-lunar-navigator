@@ -46,6 +46,8 @@ function App() {
   const [cameraSensitivity, setCameraSensitivity] = useState(1.8);
   const [cameraInfo, setCameraInfo] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  // Free View walking: key and pad presses are collected here and used up by the 3D scene each frame.
+  const freeMoveRef = useRef({ forward: 0, right: 0 });
   const handleLookDrag = useCallback((yawDegrees, pitchDegrees) => {
     setCameraPan((current) => ({
       yaw: current.yaw + yawDegrees,
@@ -87,13 +89,20 @@ function App() {
     };
     const increment = increments[direction];
     if (!increment) return;
+    if (viewMode === 'free') {
+      // In Free View the same keys and pad walk the camera instead of turning it.
+      const steps = { up: [1, 0], down: [-1, 0], left: [0, -1], right: [0, 1] }[direction];
+      freeMoveRef.current.forward += steps[0] * amount;
+      freeMoveRef.current.right += steps[1] * amount;
+      return;
+    }
     const sign = invertLook ? -1 : 1;
 
     setCameraPan((current) => ({
       yaw: current.yaw + increment.yaw * sign * amount,
       pitch: Math.max(-35, Math.min(35, current.pitch + increment.pitch * sign * amount))
     }));
-  }, [invertLook]);
+  }, [invertLook, viewMode]);
 
   const resetCameraPan = useCallback(() => setCameraPan({ yaw: 0, pitch: 0 }), []);
   const lookAt = useCallback((body) => {
@@ -199,6 +208,7 @@ function App() {
         onCameraInfo={setCameraInfo}
         cameraInfo={cameraInfo}
         showInterface={showInterface}
+        freeMoveRef={freeMoveRef}
       />
 
       <div className="overlay-container">

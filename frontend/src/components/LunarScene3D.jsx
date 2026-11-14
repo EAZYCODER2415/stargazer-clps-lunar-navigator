@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import '../styles/lunarScene.css';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
@@ -36,7 +35,11 @@ const FAR_LAYER = 2;               // terrain beyond ~5 km is drawn in a separat
 const FAR_RING_START = 4;
 const GRAIN_TILE_M = 13.3;         // one repeat of the dust texture
 const SUN_STRENGTH = 4.2;          // how bright full sunlight is on the ground, rocks and lander
-const FREE_VIEW_MAX_DISTANCE = 2500;
+// Free View: walk over the real ground at head height, never more than this far from the lander.
+const FREE_VIEW_RANGE = 2000;
+const FREE_VIEW_EYE_HEIGHT = 2;
+const FREE_VIEW_KEEP_OUT = 3.5;    // do not walk through the lander
+const FREE_VIEW_START_DISTANCE = 16;
 
 // Real angular radii: Sun 0.27°, Earth 0.95° as seen from the Moon. Drawn larger so they read on screen.
 const SUN_EXAGGERATION = 3;
@@ -691,7 +694,8 @@ const LunarScene3D = ({
   onLookDrag,
   onCameraInfo,
   cameraInfo,
-  showInterface
+  showInterface,
+  freeMoveRef
 }) => {
   const [fps, setFps] = useState(0);
   const [hover, setHover] = useState(null);
@@ -700,11 +704,11 @@ const LunarScene3D = ({
   const containerRef = useRef(null);
   const stageRef = useRef(null);       // everything created once
   const siteRef = useRef(null);        // everything rebuilt per site
-  const propsRef = useRef({ cameraYaw, cameraPitch, viewMode, invertLook, onLookDrag, onCameraInfo });
+  const propsRef = useRef({ cameraYaw, cameraPitch, viewMode, invertLook, onLookDrag, onCameraInfo, freeMoveRef });
 
   // Latest props for the render loop and pointer handlers, which are set up only once.
   useEffect(() => {
-    propsRef.current = { cameraYaw, cameraPitch, viewMode, invertLook, onLookDrag, onCameraInfo };
+    propsRef.current = { cameraYaw, cameraPitch, viewMode, invertLook, onLookDrag, onCameraInfo, freeMoveRef };
   });
 
   // ---- One-time setup: renderer, sky, lander, input ----
@@ -789,15 +793,6 @@ const LunarScene3D = ({
     // Lights must be on both terrain layers, or the far terrain would be drawn unlit.
     [sunLight, earthLight, fillLight, ...workLight.children].forEach((light) => light.layers.enable(FAR_LAYER));
 
-    // Free View: orbit around the lander. Limits stop the camera going under the ground.
-    const orbit = new OrbitControls(camera, renderer.domElement);
-    orbit.enabled = false;
-    orbit.enableDamping = true;
-    orbit.dampingFactor = 0.08;
-    orbit.target.set(0, 1.2, 0);
-    orbit.minDistance = 5;
-    orbit.maxDistance = FREE_VIEW_MAX_DISTANCE;   // far enough out to see the real shape of the land
-    orbit.maxPolarAngle = Math.PI / 2 - 0.02;
 
     const resize = () => {
       const { width, height } = container.getBoundingClientRect();
@@ -819,7 +814,6 @@ const LunarScene3D = ({
     let lastHoverCheck = 0;
 
     const onPointerDown = (event) => {
-      if (propsRef.current.viewMode !== 'surface') return;
       drag.active = true; drag.x = event.clientX; drag.y = event.clientY;
       canvas.setPointerCapture?.(event.pointerId);
       canvas.style.cursor = 'grabbing';
@@ -853,10 +847,9 @@ const LunarScene3D = ({
     const endDrag = (event) => {
       drag.active = false;
       canvas.releasePointerCapture?.(event.pointerId);
-      canvas.style.cursor = propsRef.current.viewMode === 'surface' ? 'grab' : 'default';
+      canvas.style.cursor = 'grab';
     };
     const onWheel = (event) => {
-      if (propsRef.current.viewMode !== 'surface') return;
       event.preventDefault();
       camera.fov = Math.max(8, Math.min(80, camera.fov * (event.deltaY > 0 ? 1.08 : 1 / 1.08)));
       camera.updateProjectionMatrix();
@@ -870,7 +863,7 @@ const LunarScene3D = ({
     canvas.addEventListener('wheel', onWheel, { passive: false });
 
     stageRef.current = {
-      scene, skyRoot, camera, renderer, orbit, sunLight, earthLight, fillLight, stars, sun, sunGlow, earth,
+      scene, skyRoot, camera, renderer, sunLight, earthLight, fillLight, stars, sun, sunGlow, earth,
       sunUniforms, sunDirectionWorld, shadowsDirty: true,
       skyGrid, sunPath, sunTrail, earthPath, earthTrail, linkBeam,
       lander, dishMount, sensorHead, workLight, mode: null, keyLightAzimuth: 0
@@ -880,11 +873,14 @@ const LunarScene3D = ({
     let fpsWindowStart = performance.now();
     let lastInfo = { centerAz: -1, fov: -1, at: 0 };
     const forward = new THREE.Vector3();
+    let lastFrameAt = performance.now();
     let frame;
     const render = () => {
       frame = requestAnimationFrame(render);
       if (document.hidden) return;
       const now = performance.now();
+      const deltaSeconds = Math.min(0.1, (now - lastFrameAt) / 1000);
+      lastFrameAt = now;
       frameCount += 1;
       if (now - fpsWindowStart >= 1000) {
         setFps(Math.round((frameCount * 1000) / (now - fpsWindowStart)));
@@ -892,30 +888,45 @@ const LunarScene3D = ({
       }
       const stage = stageRef.current;
       const { viewMode: mode, cameraYaw: yaw, cameraPitch: pitch } = propsRef.current;
+      const site = siteRef.current;
+      const groundAt = (x, z) => (site ? site.terrain.heightAt(x, z) : 0);
+      const moves = propsRef.current.freeMoveRef?.current;
       if (stage.mode !== mode) {
         stage.mode = mode;
         if (mode === 'free') {
-          camera.fov = 50; camera.updateProjectionMatrix();
-          // Start on the sunlit side of the lander (or the Earth side at night).
+          // Start a few steps from the lander on its sunlit side (or the Earth side at night), facing it.
           const side = (stage.keyLightAzimuth + 38) * DEG;
-          camera.position.set(Math.sin(side) * 19, 4.5, -Math.cos(side) * 19);
-          orbit.target.set(0, 1.2, 0);
-          orbit.enabled = true;
-          canvas.style.cursor = 'default';
+          const x = Math.sin(side) * FREE_VIEW_START_DISTANCE; const z = -Math.cos(side) * FREE_VIEW_START_DISTANCE;
+          camera.position.set(x, groundAt(x, z) + FREE_VIEW_EYE_HEIGHT, z);
+          propsRef.current.onLookDrag?.(Math.atan2(x, z) / DEG - yaw, -3 - pitch);
         } else {
-          orbit.enabled = false;
-          camera.fov = 62; camera.updateProjectionMatrix();
           camera.position.set(0, EYE_Y, 0);
-          canvas.style.cursor = 'grab';
         }
+        if (moves) { moves.forward = 0; moves.right = 0; }
+        canvas.style.cursor = 'grab';
         sensorHead.visible = mode === 'free';   // don't put the sensor inside the POV camera
       }
-      const site = siteRef.current;
       if (mode === 'free') {
-        orbit.update();
-        // The real ground can rise above the orbit path: keep the camera out of the hillside.
-        if (site) camera.position.y = Math.max(camera.position.y, site.terrain.heightAt(camera.position.x, camera.position.z) + 1.5);
-      } else camera.rotation.set(pitch * DEG, yaw * DEG, 0, 'YXZ');
+        // Walking: arrow keys / WASD arrive as steps (see App.jsx). A step is longer far from the
+        // lander, so the 2 km range can be crossed without holding a key for minutes.
+        const position = camera.position;
+        if (moves && (moves.forward || moves.right)) {
+          const stride = 0.8 + 0.005 * Math.hypot(position.x, position.z);
+          const heading = yaw * DEG;
+          position.x += (-Math.sin(heading) * moves.forward + Math.cos(heading) * moves.right) * stride;
+          position.z += (-Math.cos(heading) * moves.forward - Math.sin(heading) * moves.right) * stride;
+          moves.forward = 0; moves.right = 0;
+          const distance = Math.hypot(position.x, position.z);
+          const allowed = Math.min(FREE_VIEW_RANGE, Math.max(FREE_VIEW_KEEP_OUT, distance));
+          if (distance > 0 && allowed !== distance) { position.x *= allowed / distance; position.z *= allowed / distance; }
+          if (distance === 0) position.x = FREE_VIEW_KEEP_OUT;
+        }
+        // The eye stays a fixed height above the real ground, eased so that steps over coarse terrain are not jerky.
+        const eyeHeight = groundAt(position.x, position.z) + FREE_VIEW_EYE_HEIGHT;
+        position.y += (eyeHeight - position.y) * Math.min(1, deltaSeconds * 12);
+        position.y = Math.max(position.y, eyeHeight - 0.8);     // never dip to the surface on a steep slope
+      }
+      camera.rotation.set(pitch * DEG, yaw * DEG, 0, 'YXZ');
 
       // Terrain shadows: a few milliseconds of work per frame after the Sun moves, then idle.
       if (site) site.applySunlight(site.terrain.stepSunlight(4));
@@ -948,7 +959,7 @@ const LunarScene3D = ({
       // 3. Everything near: ground out to about 5 km, rocks, lander.
       renderer.clearDepth();
       if (stage.shadowsDirty) { renderer.shadowMap.needsUpdate = true; stage.shadowsDirty = false; }
-      drawPass(scene, 0, 1, FREE_VIEW_MAX_DISTANCE + 10000);
+      drawPass(scene, 0, 1, FREE_VIEW_RANGE + 10000);
     };
     render();
 
@@ -961,7 +972,6 @@ const LunarScene3D = ({
       canvas.removeEventListener('pointercancel', endDrag);
       canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('wheel', onWheel);
-      orbit.dispose();
       disposeObject(scene);
       disposeObject(skyScene);
       renderer.dispose();
@@ -1045,7 +1055,10 @@ const LunarScene3D = ({
     // Disc centres sit at the true elevation; the skyline hides whatever is below it.
     stage.sun.position.copy(skyPoint(sunPosition.azimuth, sunPosition.elevation));
     stage.earth.group.position.copy(skyPoint(earthPosition.azimuth, earthPosition.elevation));
-    // From high up in Free View you can see past the horizon, so hide bodies that have fully set.
+    // The skyline shell is the view from the mast, so it is only drawn in the POV camera. In Free View
+    // the terrain itself hides the Sun and Earth from wherever you stand, and a body that has fully
+    // set at the lander is hidden, so the picture never contradicts the readouts.
+    site.skyline.group.visible = viewMode === 'surface';
     stage.sun.visible = viewMode === 'surface' || sunClearance > -0.265 * SUN_EXAGGERATION;
     stage.earth.group.visible = viewMode === 'surface' || earthClearance > -0.95 * EARTH_EXAGGERATION;
     stage.earth.material.uniforms.uSunDirection.value.copy(sunDirection);

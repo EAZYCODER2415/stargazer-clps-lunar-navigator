@@ -99,7 +99,11 @@ const CameraControls = ({
             <ChevronDown size={15} />
           </button>
         </div>
-        <span className="camera-pan-hint">Arrows / WASD · direction {invertLook ? 'inverted' : 'normal'}</span>
+        <span className="camera-pan-hint">
+          {viewMode === 'free'
+            ? 'Arrows / WASD walk · drag to look · stays within 2 km'
+            : `Arrows / WASD · direction ${invertLook ? 'inverted' : 'normal'}`}
+        </span>
         <div className="camera-look-actions">
           <button type="button" onClick={() => onLookAt('sun')}>Look at Sun</button>
           <button type="button" onClick={() => onLookAt('earth')}>Look at Earth</button>
