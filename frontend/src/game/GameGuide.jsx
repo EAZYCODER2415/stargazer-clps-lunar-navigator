@@ -3,17 +3,17 @@ function GameGuide({ onClose }) {
     <div className="guide-backdrop" role="presentation">
       <section className="guide-dialog" role="dialog" aria-modal="true" aria-labelledby="guide-title">
         <span className="view-overline">STARGAZER · MISSION CONTROL BRIEFING</span>
-        <h2 id="guide-title">Your objective: establish a robotic outpost</h2>
-        <p>Compare the candidate locations, commit to one, send Robot 01 to the Moon, survey the site, then deploy the outpost beacon.</p>
+        <h2 id="guide-title">Prepare the lander. Choose when to launch.</h2>
+        <p>Mission 001 gives you four departments, three scheduled scenario windows, and one robotic lander to send to the Moon.</p>
         <ol>
-          <li><strong>Choose a site.</strong> Review Sun and Earth visibility before committing. After launch, the destination is fixed.</li>
-          <li><strong>Manage supplies.</strong> Energy and materials are abstract game units. Sun-visible hours recharge one energy unit per hour at the site.</li>
-          <li><strong>Advance mission time.</strong> The robot’s schematic Earth-to-Moon marker moves only when you advance time. Arrival takes six game hours.</li>
-          <li><strong>Run surface operations.</strong> Survey is required; exploration is optional. Survey detail depends on Sun visibility, and Earth visibility indicates a geometric reporting opportunity.</li>
-          <li><strong>Service the robot.</strong> After two completed operations service is recommended; after three it is required. This deterministic counter is only a game abstraction.</li>
-          <li><strong>Switch views.</strong> Mission View shows illustrative transit. Lunar Surface View shows a schematic of the actual candidate site coordinates.</li>
+          <li><strong>Work any department.</strong> Engineering, Launch Operations, Weather and Communications share one mission state. Switching departments does not pause the clock.</li>
+          <li><strong>Complete mandatory tasks.</strong> Repair the diagnosed sensor fault, check both critical launch items, configure the simulated receiver, and make a correct weather assessment for the active window.</li>
+          <li><strong>Optional checks reduce scenario risk.</strong> The power bus, independent launch review and backup receiver are optional; each subtracts one point from the game risk index.</li>
+          <li><strong>Watch the launch timeline.</strong> Three deterministic windows appear. Window 2 has a no-go forecast. You may skip an active window; preparation carries forward.</li>
+          <li><strong>Launch only when ready.</strong> Launch is enabled only during an active, assessed GO or CAUTION window after every mandatory gate is met.</li>
+          <li><strong>Use pause and speed controls.</strong> At 1×, one game minute passes per real second. Pause freezes the scenario clock and all window transitions.</li>
         </ol>
-        <p className="guide-caveat">Sun visibility is not a power-system model. Earth visibility is not a communications link budget. Nothing shown here validates landing safety or real spacecraft trajectories.</p>
+        <p className="guide-caveat">Window timing, weather, risk and mission outcomes are classroom game scenarios—not real launch forecasts. Stargazer's lunar visibility data is separate from Earth-to-Moon launch planning.</p>
         <button className="game-button primary" onClick={onClose}>Enter Mission Control</button>
       </section>
     </div>
