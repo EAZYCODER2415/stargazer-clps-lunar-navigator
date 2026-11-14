@@ -1,4 +1,9 @@
-import { calculateEarthPosition, calculateSunPosition, getVisibilitySummary } from '../utils/ephemerisRuntime';
+import {
+  calculateEarthPosition,
+  calculateSunPosition,
+  getBestOverlap,
+  getVisibilitySummary
+} from '../utils/ephemerisRuntime';
 import landingSites from '../data/landingSites.json';
 
 const ComparisonPanel = ({ selectedDate, onClose }) => {
@@ -16,13 +21,14 @@ const ComparisonPanel = ({ selectedDate, onClose }) => {
         {landingSites.map((site) => {
           const sun = getVisibilitySummary(selectedDate, calculateSunPosition, site.latitude, site.longitude);
           const earth = getVisibilitySummary(selectedDate, calculateEarthPosition, site.latitude, site.longitude);
+          const bestOverlap = getBestOverlap(site.latitude, site.longitude);
           return (
             <section key={site.name} className="comparison-card">
               <strong>{site.name}</strong>
               <span>{Math.abs(site.latitude).toFixed(2)}° S · {Math.abs(site.longitude).toFixed(2)}° E</span>
               <div><b>{sun.visibleHours.toFixed(0)} h</b> Sun visible</div>
               <div><b>{earth.visibleHours.toFixed(0)} h</b> Earth visible</div>
-              <small>Best overlap: {Math.min(sun.longestWindowHours, earth.longestWindowHours).toFixed(1)} h</small>
+              <small>Best overlap: {bestOverlap?.hours.toFixed(1) || '0.0'} h</small>
             </section>
           );
         })}

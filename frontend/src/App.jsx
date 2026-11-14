@@ -10,8 +10,8 @@ import {
   findNextHorizonTransition,
   getVisibilityBands,
   getVisibilitySummary,
-  createEphemerisTable,
-  isAboveHorizon
+  isAboveHorizon,
+  getBestOverlap
 } from './utils/ephemerisRuntime';
 import './styles/horizonTracker.css';
 import ComparisonPanel from './components/ComparisonPanel';
@@ -144,28 +144,19 @@ function App() {
     () => getVisibilityBands(windowStart, calculateEarthPosition, selectedSite.latitude, selectedSite.longitude),
     [windowStart, selectedSite]
   );
-  const sunTable = useMemo(() => createEphemerisTable(windowStart, calculateSunPosition, selectedSite.latitude, selectedSite.longitude), [windowStart, selectedSite]);
-  const earthTable = useMemo(() => createEphemerisTable(windowStart, calculateEarthPosition, selectedSite.latitude, selectedSite.longitude), [windowStart, selectedSite]);
-  const bestWindow = useMemo(() => {
-    let best = null;
-    sunTable.forEach((sample, index) => {
-      const earth = earthTable[index];
-      if (sample.elevation >= 0 && earth.elevation >= 0) {
-        const next = sunTable[index + 1];
-        const hours = next ? (next.time - sample.time) / 3600000 : 0;
-        if (!best || hours > best.hours) best = { time: sample.time, hours };
-      }
-    });
-    return best;
-  }, [sunTable, earthTable]);
+  const bestWindow = useMemo(
+    () => getBestOverlap(selectedSite.latitude, selectedSite.longitude),
+    [selectedSite]
+  );
   const handleJumpTo = (target) => {
     if (target === 'best' && bestWindow) return setTime(bestWindow.time);
     const transition = target === 'sun' ? nextSunTransition : nextEarthTransition;
     if (transition) setTime(transition.time);
   };
-  const verdict = telemetry.isSunVisible
-    ? `Sun is visible. Array power is available. Earth is ${telemetry.isEarthVisible ? 'visible, so direct radio contact is possible.' : 'below the horizon.'}`
-    : `Sun is down. Rises in ${Math.round(nextSunTransition?.hours || 0)} hours. Earth is ${telemetry.isEarthVisible ? 'visible, so direct radio contact is possible.' : 'below the horizon.'}`;
+  const directRadioPossible = telemetry.isSunVisible && telemetry.isEarthVisible;
+  const verdict = directRadioPossible
+    ? 'Sun and Earth are visible. Array power and direct radio contact are available.'
+    : `Direct radio contact is impossible. Sun is ${telemetry.isSunVisible ? 'visible' : `down and rises in ${Math.round(nextSunTransition?.hours || 0)} hours`}; Earth is ${telemetry.isEarthVisible ? 'visible' : 'below the horizon'}.`;
 
   return (
     <div className="app">

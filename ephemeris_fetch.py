@@ -118,6 +118,34 @@ def write_frontend_site_manifest():
         output.write("\n")
 
 
+def calculate_longest_sun_earth_overlap(sun_rows, earth_rows, step_hours):
+    """Return the longest contiguous window where both bodies are above the horizon."""
+    mission_rows = round(29.53 * 24 / step_hours)
+    sun_rows = sun_rows[:mission_rows]
+    earth_rows = earth_rows[:mission_rows]
+    best_length = 0
+    best_start = None
+    current_length = 0
+    current_start = None
+
+    for sun_row, earth_row in zip(sun_rows, earth_rows):
+        if sun_row["el"] > 0 and earth_row["el"] > 0:
+            if current_length == 0:
+                current_start = sun_row["t"]
+            current_length += 1
+            if current_length > best_length:
+                best_length = current_length
+                best_start = current_start
+        else:
+            current_length = 0
+            current_start = None
+
+    return {
+        "hours": round(best_length * step_hours, 1),
+        "start": best_start,
+    }
+
+
 def main():
     write_frontend_site_manifest()
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -126,6 +154,9 @@ def main():
         data = {"site": site, "start": START, "step_h": 1}
         for name, bid in BODIES.items():
             data[name] = fetch(bid, site)
+        data["best_overlap"] = calculate_longest_sun_earth_overlap(
+            data["sun"], data["earth"], data["step_h"]
+        )
         path = f"{OUT_DIR}/{site['id']}.json"
         with open(path, "w") as f:
             json.dump(data, f)

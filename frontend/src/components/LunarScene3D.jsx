@@ -161,6 +161,40 @@ const createStars = () => {
   return new THREE.Points(geometry, material);
 };
 
+const createGridLabel = (text, color) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const context = canvas.getContext('2d');
+  context.font = '700 28px monospace';
+  context.fillStyle = color;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(text, canvas.width / 2, canvas.height / 2);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(canvas),
+    transparent: true,
+    depthWrite: false
+  }));
+  sprite.scale.set(2.6, 0.65, 1);
+  return sprite;
+};
+
+const createSceneGridLabels = () => {
+  const group = new THREE.Group();
+  for (let azimuth = 0; azimuth < 360; azimuth += 30) {
+    const label = createGridLabel(`${azimuth}°`, '#cbd5e1');
+    label.position.copy(celestialPosition(azimuth, 0, 29.5, 0));
+    group.add(label);
+  }
+  [-10, -5, 0, 5, 10].forEach((distance) => {
+    const label = createGridLabel(`${distance + 10} km`, '#94a3b8');
+    label.position.set(distance, 0.12, -6.5);
+    group.add(label);
+  });
+  return group;
+};
+
 const createCrater = (radius, depth, x, z) => {
   const geometry = new THREE.CircleGeometry(radius, 32);
   const material = new THREE.MeshBasicMaterial({
@@ -188,71 +222,6 @@ const createTrajectory = (color) => {
   const trajectory = new THREE.Line(geometry, material);
   trajectory.renderOrder = 20;
   return trajectory;
-};
-
-const createRelaySensor = () => {
-  const sensor = new THREE.Group();
-  const beaconMaterial = new THREE.MeshStandardMaterial({
-    color: 0xff7a00,
-    emissive: 0xff4d00,
-    emissiveIntensity: 1.3,
-    metalness: 0.25,
-    roughness: 0.35,
-    polygonOffset: true,
-    polygonOffsetFactor: -2
-  });
-  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 0.72, 12), beaconMaterial);
-  beacon.position.y = 0.7;
-  sensor.add(beacon);
-
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.29, 16, 10), beaconMaterial);
-  cap.scale.y = 0.45;
-  cap.position.y = 1.08;
-  sensor.add(cap);
-
-  const base = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.52, 0.62, 0.14, 16),
-    new THREE.MeshStandardMaterial({
-      color: 0xf8fafc,
-      emissive: 0x7c2d12,
-      emissiveIntensity: 0.25,
-      metalness: 0.55,
-      roughness: 0.4,
-      polygonOffset: true,
-      polygonOffsetFactor: -2
-    })
-  );
-  base.position.y = 0.08;
-  sensor.add(base);
-
-  const beaconRing = new THREE.Mesh(
-    new THREE.TorusGeometry(0.38, 0.035, 8, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.95, depthTest: false })
-  );
-  beaconRing.rotation.x = Math.PI / 2;
-  beaconRing.position.y = 0.28;
-  beaconRing.renderOrder = 22;
-  sensor.add(beaconRing);
-
-  const antenna = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.025, 0.65, 8),
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.7, roughness: 0.3 })
-  );
-  antenna.position.set(0, 1.47, 0);
-  sensor.add(antenna);
-
-  const marker = new THREE.Sprite(new THREE.SpriteMaterial({
-    color: 0xff7a00,
-    transparent: true,
-    opacity: 0.4,
-    depthTest: false
-  }));
-  marker.scale.set(1.7, 1.7, 1);
-  marker.position.y = 0.8;
-  marker.renderOrder = 21;
-  sensor.add(marker);
-
-  return sensor;
 };
 
 const getOverlayOrbitPoint = (azimuth, radius) => {
@@ -467,11 +436,6 @@ const LunarScene3D = ({
     lander.position.set(0, getTerrainHeight(0, -8), -8);
     lander.scale.setScalar(1.35);
     scene.add(lander);
-    const relaySensor = createRelaySensor();
-    relaySensor.position.set(0, getTerrainHeight(0, -2.2), -2.2);
-    relaySensor.scale.setScalar(1.15);
-    scene.add(relaySensor);
-
     const stars = createStars();
     scene.add(stars);
 
@@ -479,7 +443,8 @@ const LunarScene3D = ({
     const earthTrajectory = createTrajectory(0x38bdf8);
     const craterRim = createCraterRim();
     const azimuthGrid = createAzimuthGrid();
-    scene.add(solarTrajectory, earthTrajectory, craterRim, azimuthGrid);
+    const sceneGridLabels = createSceneGridLabels();
+    scene.add(solarTrajectory, earthTrajectory, craterRim, azimuthGrid, sceneGridLabels);
 
     const resize = () => {
       const { width, height } = container.getBoundingClientRect();
@@ -506,9 +471,9 @@ const LunarScene3D = ({
       ,
       craterRim,
       azimuthGrid,
+      sceneGridLabels,
       earthClouds,
-      sunRays,
-      relaySensor
+      sunRays
     };
 
     let frameCount = 0;
@@ -592,6 +557,7 @@ const LunarScene3D = ({
     layers.earthTrajectory.computeLineDistances();
     layers.craterRim.visible = showHorizonMask;
     layers.azimuthGrid.visible = showGrid;
+    layers.sceneGridLabels.visible = showGrid;
   }, [
     time,
     selectedSite,
@@ -608,13 +574,12 @@ const LunarScene3D = ({
   const overlaySunTrail = getOverlayTrailPath(sunPosition.azimuth, 30);
   const overlayEarthTrail = getOverlayTrailPath(earthPosition.azimuth, 17);
   const aerialLabels = useMemo(() => ([
-    { key: 'north', label: 'N', azimuth: 0, elevation: 10, className: 'cardinal' },
+    { key: 'north', label: 'N', azimuth: 0, elevation: 10, className: 'cardinal north' },
     { key: 'east', label: 'E', azimuth: 90, elevation: 10, className: 'cardinal' },
     { key: 'south', label: 'S', azimuth: 180, elevation: 10, className: 'cardinal' },
     { key: 'west', label: 'W', azimuth: 270, elevation: 10, className: 'cardinal' },
     { key: 'site', label: selectedSite.name, azimuth: 180, elevation: 2, className: 'site' },
     { key: 'rim', label: 'Malapert rim · 2.4 km', azimuth: 180, elevation: 8, className: 'feature' },
-    { key: 'sensor', label: 'Sensor · 0 m', azimuth: 180, elevation: 1, className: 'sensor' },
     { key: 'sun', label: `Sun · ${sunPosition.elevation.toFixed(1)}°`, azimuth: sunPosition.azimuth, elevation: Math.max(0, sunPosition.elevation), className: 'sun' },
     { key: 'earth', label: `Earth · ${earthPosition.elevation.toFixed(1)}°`, azimuth: earthPosition.azimuth, elevation: Math.max(0, earthPosition.elevation), className: 'earth' }
   ]), [selectedSite, sunPosition.azimuth, sunPosition.elevation, earthPosition.azimuth, earthPosition.elevation]);
@@ -676,7 +641,7 @@ const LunarScene3D = ({
               {aerialLabels.map((item) => {
                 const left = Math.min(86, Math.max(14, 50 + Math.sin(item.azimuth * DEG_TO_RAD) * 42));
                 const bottom = Math.min(84, Math.max(14, 8 + Math.min(item.elevation, 20) / 20 * 82));
-                const interactive = ['sun', 'earth', 'sensor'].includes(item.key);
+                const interactive = ['sun', 'earth'].includes(item.key);
                 return (
                   <button
                     type="button"
@@ -710,20 +675,12 @@ const LunarScene3D = ({
           )}
         </>
       ), azimuthHost)}
-      <div className="dome-grid-metrics" aria-label="Dome azimuth and elevation metrics">
-        <span>AZIMUTH 0° · 30° · 60° · 90° · 120° · 150° · 180° · 210° · 240° · 270° · 300° · 330°</span>
-        <span>ELEVATION 0° · 5° · 10° · 15° · 20° · 30° · 45° · 60° · 75°</span>
-      </div>
-      <div className="topography-grid-scale" aria-label="Moon topography scale">
-        <span>0 km</span><span>5 km</span><span>10 km</span>
-      </div>
       {popup && azimuthHost && createPortal((
         <div className="scene-element-popup" role="dialog" aria-label={`${popup.key} details`} style={{ left: `${popup.left}px`, top: `${popup.top}px` }}>
           <strong>{popup.key === 'sun' ? 'Sun' : popup.key === 'earth' ? 'Earth' : 'Sensor'}</strong>
           <span>
             {popup.key === 'sun' && `Solar elevation ${sunPosition.elevation.toFixed(2)}° · azimuth ${sunPosition.azimuth.toFixed(1)}°`}
             {popup.key === 'earth' && `Earth elevation ${earthPosition.elevation.toFixed(2)}° · azimuth ${earthPosition.azimuth.toFixed(1)}°`}
-            {popup.key === 'sensor' && 'Orange exposure sensor centered in the POV reference frame'}
           </span>
           <button type="button" className="popup-close-link" onClick={() => setPopup(null)}>Close</button>
         </div>

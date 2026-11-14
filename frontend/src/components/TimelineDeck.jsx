@@ -64,6 +64,33 @@ const TimelineDeck = ({
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   };
 
+  const updateTimeFromPointer = (event) => {
+    const slider = scrubRef.current;
+    if (!slider) return;
+    const rect = slider.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    const min = windowStart.getTime();
+    const max = min + 29.53 * 86400000;
+    const nextTime = new Date(min + ratio * (max - min));
+    setDateSliderValue(nextTime.getTime());
+    onTimeChange(nextTime);
+  };
+
+  const handleMarkerPointerDown = (event) => {
+    isScrubbingRef.current = true;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    updateTimeFromPointer(event);
+  };
+
+  const handleMarkerPointerMove = (event) => {
+    if (isScrubbingRef.current) updateTimeFromPointer(event);
+  };
+
+  const handleMarkerPointerUp = (event) => {
+    isScrubbingRef.current = false;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+
   // Format values for telemetry gauges
   const formatArrayFlux = (power) => {
     // Simplified conversion from solar power to array flux
@@ -75,6 +102,12 @@ const TimelineDeck = ({
     if (snr < 0) return 'N/A dB';
     return `${snr.toFixed(1)} dB`;
   };
+
+  const timelineDuration = 29.53 * 86400000;
+  const timelineProgress = Math.max(
+    0,
+    Math.min(100, ((dateSliderValue - windowStart.getTime()) / timelineDuration) * 100)
+  );
 
   return (
     <div className="timeline-deck">
@@ -166,6 +199,12 @@ const TimelineDeck = ({
               <option value={86400}>86400x (1d / sec)</option>
             </select>
           </div>
+          <div className="timeline-jump-actions">
+            <button type="button" onClick={() => onJumpTo('sun')}>Next sunrise</button>
+            <button type="button" onClick={() => onJumpTo('earth')}>Next Earth rise</button>
+            <button type="button" onClick={() => onJumpTo('best')}>Best overlap</button>
+            <span>{bestWindow ? `Best overlap ${bestWindow.hours.toFixed(1)} h` : 'No overlap found'}</span>
+          </div>
         </div>
 
         {/* Interactive Date Slider (Scrub Bar) */}
@@ -176,6 +215,25 @@ const TimelineDeck = ({
           </div>
 
           <div className="timeline-slider-wrap">
+            <div
+              className="timeline-scrub-progress"
+              style={{ width: `${timelineProgress}%` }}
+              aria-hidden="true"
+            />
+            <div
+              className="timeline-current-marker"
+              style={{ left: `${timelineProgress}%` }}
+              role="slider"
+              aria-label="Mission timeline position"
+              aria-valuemin={windowStart.getTime()}
+              aria-valuemax={windowStart.getTime() + 29.53 * 86400000}
+              aria-valuenow={dateSliderValue}
+              tabIndex={0}
+              onPointerDown={handleMarkerPointerDown}
+              onPointerMove={handleMarkerPointerMove}
+              onPointerUp={handleMarkerPointerUp}
+              onPointerCancel={handleMarkerPointerUp}
+            />
             <input
               type="range"
               min={windowStart.getTime()}
@@ -222,12 +280,6 @@ const TimelineDeck = ({
           <div className="timeline-deck-status">
             <span>{telemetry.isSunVisible ? 'Next sunset' : 'Sunrise'}: {Math.round(nextSunTransition?.hours || 0)} h</span>
             <span>{telemetry.isEarthVisible ? 'Earth visible' : 'Earth hidden'}: {Math.round(nextEarthTransition?.hours || 0)} h transition</span>
-          </div>
-          <div className="timeline-jump-actions">
-            <button type="button" onClick={() => onJumpTo('sun')}>Next sunrise</button>
-            <button type="button" onClick={() => onJumpTo('earth')}>Next Earth rise</button>
-            <button type="button" onClick={() => onJumpTo('best')}>Best overlap</button>
-            <span>{bestWindow ? `Best overlap ${bestWindow.hours.toFixed(1)} h` : 'No overlap found'}</span>
           </div>
         </div>
       </div>
