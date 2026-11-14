@@ -1,3 +1,5 @@
 # LOLA elevation map downloaded by lola_terrain.py (111 MB, re-downloadable)
 lola_cache/
 __pycache__/
+# Detailed per-site masks written by lola_terrain.py (the web app reads its own copies under frontend/src/data)
+/terrain/
