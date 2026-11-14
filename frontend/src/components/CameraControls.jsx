@@ -11,7 +11,8 @@ const CameraControls = ({
   invertLook,
   onInvertLookChange,
   onLookAt,
-  sensitivity = 1.8
+  sensitivity = 1.8,
+  isHidden = false
 }) => {
   useEffect(() => {
     const pressed = new Set();
@@ -66,7 +67,7 @@ const CameraControls = ({
   }, [onPan, sensitivity]);
 
   return (
-    <div className="camera-controls">
+    <div className={`camera-controls${isHidden ? ' is-hidden' : ''}`}>
       <div className="control-group">
         <label htmlFor="view-mode">Camera View:</label>
         <select

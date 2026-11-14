@@ -1,20 +1,21 @@
 """
 Pull hourly Sun + Earth azimuth/elevation for each landing site from JPL Horizons.
-Output: one JSON per site in ./ephemeris/  (this is the "already-calculated" ephemeris Liam means)
+Output: one JSON per site in ./ephemeris_long/  (this is the "already-calculated" ephemeris Liam means)
+Default: 118.2 days of hourly rows (4 lunar days). The first 709 rows are one lunar day (29.53 days).
 
 Run:  pip install requests  &&  python ephemeris_fetch.py
 No API key needed.
 
 Optional: python ephemeris_fetch.py <days> <output_folder>
-  e.g.    python ephemeris_fetch.py 118.2 ephemeris_long   (4 lunar days, for the multi-month cost model)
+  e.g.    python ephemeris_fetch.py 29.53 my_folder   (one lunar day only)
 """
 import json, os, sys, requests
 from datetime import datetime, timedelta
 
 API = "https://ssd.jpl.nasa.gov/api/horizons.api"
 START = "2026-12-01 00:00"       # change to the scenario start date
-DAYS = float(sys.argv[1]) if len(sys.argv) > 1 else 29.53   # default: one synodic month = one lunar day
-OUT_DIR = sys.argv[2] if len(sys.argv) > 2 else "ephemeris"
+DAYS = float(sys.argv[1]) if len(sys.argv) > 1 else 118.2   # default: 4 synodic months (4 lunar days)
+OUT_DIR = sys.argv[2] if len(sys.argv) > 2 else "ephemeris_long"
 STEP = "1h"
 
 # Fact-checked 14 Nov 2026 (sources in comments).

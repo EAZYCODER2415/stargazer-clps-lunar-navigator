@@ -66,10 +66,10 @@ function App() {
 
   const handleCameraPan = useCallback((direction, amount = 1) => {
     const increments = {
-      up: { yaw: 0, pitch: -6 },
-      down: { yaw: 0, pitch: 6 },
-      left: { yaw: -8, pitch: 0 },
-      right: { yaw: 8, pitch: 0 }
+      up: { yaw: 0, pitch: 6 },
+      down: { yaw: 0, pitch: -6 },
+      left: { yaw: 8, pitch: 0 },
+      right: { yaw: -8, pitch: 0 }
     };
     const increment = increments[direction];
     if (!increment) return;
@@ -87,8 +87,8 @@ function App() {
       ? calculateSunPosition(time, selectedSite.latitude, selectedSite.longitude)
       : calculateEarthPosition(time, selectedSite.latitude, selectedSite.longitude);
     setCameraPan({
-      yaw: Math.max(-75, Math.min(75, position.azimuth > 180 ? position.azimuth - 360 : position.azimuth)),
-      pitch: Math.max(-35, Math.min(35, -position.elevation))
+      yaw: -(position.azimuth > 180 ? position.azimuth - 360 : position.azimuth),
+      pitch: Math.max(-35, Math.min(35, position.elevation))
     });
   }, [selectedSite, time]);
 
@@ -203,18 +203,19 @@ function App() {
                 {' · '}Celestial disc sizes exaggerated for visibility
               </span>
             </div>
-            <CameraControls
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              onPan={handleCameraPan}
-              onResetPan={resetCameraPan}
-              invertLook={invertLook}
-              onInvertLookChange={setInvertLook}
-              onLookAt={lookAt}
-              sensitivity={cameraSensitivity}
-            />
           </>
         )}
+        <CameraControls
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onPan={handleCameraPan}
+          onResetPan={resetCameraPan}
+          invertLook={invertLook}
+          onInvertLookChange={setInvertLook}
+          onLookAt={lookAt}
+          sensitivity={cameraSensitivity}
+          isHidden={!showInterface}
+        />
         {/* Right Vertical Tool Dock */}
         <ToolDock
           activeTool={activeTool}
