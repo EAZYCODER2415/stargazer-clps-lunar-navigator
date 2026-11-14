@@ -19,6 +19,11 @@
 .game-resources > div { display: grid; gap: 2px; padding: 12px 15px; border: 1px solid #2d3b43; border-radius: 8px; background: #172229; }
 .game-resources span, .game-resources small { color: #9daeb6; font-size: 12px; }
 .game-resources strong { color: #f1f4f5; font-size: 18px; }
+.game-objective { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; max-width: 1200px; margin: 0 auto 14px; padding: 13px 15px; border: 1px solid #526b60; border-radius: 8px; background: #1c2c2b; }
+.game-objective strong { flex: 1 1 100%; color: #e4eee9; font-size: 14px; }
+.game-objective span { color: #b7c9c1; font-size: 12px; }
+.game-objective small { flex-basis: 100%; color: #9eafa7; font-size: 11px; }
+.game-objective.complete { border-color: #8fc6b0; background: #203a32; }
 .game-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .game-panel { padding: 19px; border: 1px solid #314149; border-radius: 9px; background: #172229; }
 .panel-heading { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
@@ -63,15 +68,220 @@
 .outcome-log article p { grid-column: 1 / -1; margin: 0; color: #a9b6ba; font-size: 11px; }
 .game-footer { margin-top: 15px; color: #82939a; font-size: 10px; line-height: 1.5; }
 
+/* Mission-control dashboard */
+.header-actions { display: flex; align-items: stretch; gap: 10px; }
+.game-objective { display: grid; grid-template-columns: 1fr; gap: 7px; }
+.game-objective > strong { font-size: 16px; }
+.next-task { color: #b8c8c9; font-size: 13px; }
+.next-task b { margin-right: 6px; color: #e2bc73; font-size: 10px; letter-spacing: .1em; }
+.objective-steps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+.objective-steps span { padding: 5px 8px; border: 1px solid #35474c; border-radius: 5px; color: #84969b; background: #121e23; font-size: 11px; }
+.objective-steps span.current { border-color: #c2984b; color: #f0d298; }
+.objective-steps span.done { border-color: #4b806d; color: #a8d8bf; }
+.resource-condition.healthy strong { color: #9bd4b7; }
+.resource-condition.recommended strong { color: #edc36d; }
+.resource-condition.required strong { color: #f18c78; }
+.visualization-panel { max-width: 1200px; margin: 0 auto 14px; }
+.visualization-heading { align-items: center; flex-wrap: wrap; gap: 12px; }
+.view-tabs { display: flex; gap: 6px; padding: 4px; border: 1px solid #304149; border-radius: 7px; background: #111b20; }
+.view-tabs button { padding: 8px 11px; border: 0; border-radius: 5px; color: #9db0b6; background: transparent; cursor: pointer; font-size: 12px; }
+.view-tabs button.active { color: #e4f1ea; background: #294239; }
+.view-tabs button:focus-visible, .map-site:focus-visible { outline: 2px solid #8fc6b0; outline-offset: 2px; }
+.view-overline, .map-label { color: #8fb8ad; font-size: 10px; font-weight: 750; letter-spacing: .11em; }
+.mission-view { display: grid; grid-template-columns: minmax(230px, .75fr) minmax(360px, 1.25fr); align-items: center; gap: 22px; min-height: 225px; }
+.mission-view-copy h3, .map-info-card h3 { margin: 3px 0; color: #f0f3f2; font-size: 21px; }
+.mission-view-copy > p, .map-info-card > p { margin: 0 0 12px; color: #a6b5b9; font-size: 12px; }
+.mission-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; margin: 10px 0; }
+.mission-facts > div { display: grid; gap: 1px; }
+.mission-facts dt { color: #83979c; font-size: 10px; }
+.mission-facts dd { margin: 0; color: #d8e1e1; font-size: 11px; }
+.mission-progress-track { height: 5px; overflow: hidden; margin-top: 10px; border-radius: 5px; background: #0d171c; }
+.mission-progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #3989b4, #7ecdb1); transition: width .2s linear; }
+.mission-svg { width: 100%; min-height: 185px; overflow: visible; }
+.route-base { fill: none; stroke: #3c4a50; stroke-width: 2; stroke-dasharray: 5 7; }
+.route-progress { fill: none; stroke: url(#routeGradient); stroke-width: 3; stroke-linecap: round; }
+.route-stop { fill: #e4bd6b; }
+.earth-disc { fill: #244a6c; stroke: #63a9d2; stroke-width: 2; }
+.earth-grid { fill: none; stroke: #70b5d9; stroke-width: 1; opacity: .65; }
+.moon-disc { fill: #9ba1a1; stroke: #e0e5df; stroke-width: 2; }
+.moon-crater { fill: #747d80; opacity: .7; }
+.craft-marker path { fill: #e8c775; stroke: #131b1d; stroke-width: 1.5; }
+.craft-marker { transition: transform .35s linear; }
+.craft-marker circle { fill: #27373b; stroke: none; }
+.space-label { fill: #aab8ba; font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+.route-label { fill: #82979c; font-size: 9px; letter-spacing: .1em; }
+.illustration-note { grid-column: 1 / -1; margin: -4px 0 0; color: #7f9298; font-size: 10px; line-height: 1.4; }
+.arrival-note { grid-column: 1 / -1; margin: -4px 0 0; color: #a6d6bb; font-size: 12px; }
+.live-conditions { display: flex; flex-wrap: wrap; gap: 8px 20px; padding-top: 11px; border-top: 1px solid #2b3a40; }
+.live-conditions span { color: #a1b0b4; font-size: 10px; }
+.live-conditions b { color: #c4d2d0; }
+.live-conditions span:last-child { margin-left: auto; }
+.lunar-map-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(235px, .65fr); align-items: center; gap: 17px; min-height: 235px; }
+.site-map-wrap { padding: 12px; border: 1px solid #2c3b42; border-radius: 7px; background: #101a1f; }
+.map-label { display: block; margin: 0 0 3px 4px; color: #8d9ea2; font-size: 9px; }
+.site-map { display: block; width: 100%; height: auto; }
+.map-outline { fill: #17242a; stroke: #35464c; stroke-width: 1; }
+.map-graticule { fill: none; stroke: #29383e; stroke-width: 1; stroke-dasharray: 3 5; }
+.map-site { cursor: pointer; }
+.map-site[tabindex="-1"] { cursor: default; }
+.map-hit-area { fill: transparent; }
+.map-site-dot { fill: #6eabb4; stroke: #c1e0df; stroke-width: 1.5; }
+.map-site.inspected .map-hit-area { fill: #8fc6b01a; stroke: #8fc6b0; stroke-width: 1; }
+.map-site.selected .map-site-dot { fill: #e3bd6c; stroke: #fff1ca; stroke-width: 2; }
+.map-site-name { fill: #c3d0d0; font-size: 9px; paint-order: stroke; stroke: #111a1f; stroke-width: 3px; stroke-linejoin: round; }
+.map-check { fill: none; stroke: #98dcad; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.map-robot { fill: #77c6d2; stroke: #d6f2f0; stroke-width: 1; }
+.map-robot circle { fill: #25363a; }
+.map-beacon { fill: none; stroke: #f0cf7d; stroke-width: 2; stroke-linecap: round; }
+.map-warning { stroke: #1c2020; stroke-width: 1; }
+.map-warning.recommended { fill: #e9bd61; }
+.map-warning.required { fill: #e77968; }
+.map-transit { fill: #9fbdc0; font-size: 9px; letter-spacing: .08em; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 5px 11px; color: #91a2a7; font-size: 9px; }
+.map-info-card { padding: 15px; border: 1px solid #2d3d44; border-radius: 7px; background: #111c21; }
+.map-info-card small { color: #86999e; font-size: 10px; line-height: 1.5; }
+.maintenance-status { display: grid; gap: 4px; margin-top: 12px; padding: 9px; border-radius: 5px; background: #18251f; }
+.maintenance-status strong { font-size: 11px; }
+.maintenance-status span { color: #9cafaa; font-size: 10px; line-height: 1.4; }
+.maintenance-status.healthy strong { color: #9bd4b7; }
+.maintenance-status.recommended { background: #30291b; }
+.maintenance-status.recommended strong { color: #edc36d; }
+.maintenance-status.required { background: #342220; }
+.maintenance-status.required strong { color: #f18c78; }
+.actions-panel { min-height: 330px; }
+.warning-critical { color: #f18c78 !important; }
+.mission-success { display: grid; gap: 4px; margin-top: 18px; padding: 14px; border: 1px solid #4b806d; border-radius: 6px; background: #203a32; }
+.mission-success strong { color: #b4e3c9; }
+.mission-success span { color: #a8bbb2; font-size: 12px; }
+.log-heading { display: flex; align-items: baseline; justify-content: space-between; }
+.log-heading > span { color: #7e9196; font-size: 10px; }
+.empty-log { color: #84969b; font-size: 12px; }
+.guide-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: 20px; background: rgba(4, 10, 14, .84); }
+.guide-dialog { width: min(620px, 100%); max-height: min(90vh, 780px); overflow-y: auto; padding: 25px; border: 1px solid #40565c; border-radius: 10px; background: #17242b; box-shadow: 0 20px 70px #0009; }
+.guide-dialog h2 { margin: 5px 0 8px; color: #eff4f1; font-size: 24px; line-height: 1.25; }
+.guide-dialog > p { color: #b1c0c2; font-size: 13px; line-height: 1.55; }
+.guide-dialog ol { display: grid; gap: 10px; padding-left: 21px; color: #aebec0; font-size: 12px; line-height: 1.5; }
+.guide-dialog li strong { color: #e0eae6; }
+.guide-dialog .guide-caveat { padding: 10px; border-left: 2px solid #d2a85b; background: #28271f; color: #c8bd9f; font-size: 11px; }
+.guide-dialog > button { margin-top: 4px; }
+
 @media (max-width: 760px) {
   .game-header { align-items: stretch; flex-direction: column; }
   .game-clock { min-width: 0; }
   .game-resources { grid-template-columns: 1fr 1fr; }
   .game-columns { grid-template-columns: 1fr; }
+  .header-actions { flex-direction: column-reverse; }
+  .mission-view { grid-template-columns: 1fr; gap: 6px; }
+  .mission-svg { min-height: 130px; }
+  .lunar-map-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 420px) {
   .game-page { padding: 18px 12px 28px; }
   .condition-grid { grid-template-columns: 1fr; }
   .game-panel { padding: 14px; }
+  .objective-steps span { flex: 1 1 43%; }
+  .view-tabs { width: 100%; }
+  .view-tabs button { flex: 1; padding: 8px 5px; }
+  .guide-dialog { padding: 19px; }
 }
+
+/* Stargazer brandbook tokens: near-black instrument panels, cyan controls,
+   gold Sun data, blue Earth data, and compact system typography. */
+.game-page {
+  --sg-bg: #0a0a0a;
+  --sg-deep: #050505;
+  --sg-panel: #111111;
+  --sg-secondary: #1a1a2e;
+  --sg-border: #2a2a3a;
+  --sg-text: #e0e0ff;
+  --sg-muted: #a0a0c0;
+  --sg-cyan: #4cc9f0;
+  --sg-cyan-hover: #66d9ff;
+  --sg-sun: #fbbf24;
+  --sg-earth: #66b2ff;
+  color: var(--sg-text);
+  background: var(--sg-bg);
+}
+.game-header h1, .panel-heading h2, .mission-view-copy h3, .map-info-card h3,
+.game-resources strong, .condition-card strong, .game-objective > strong,
+.guide-dialog h2 { color: var(--sg-text); }
+.game-header p, .game-clock span, .game-resources span, .game-resources small,
+.site-coordinates, .operation-description, .science-note, .commit-note,
+.condition-card small, .forecast-box span, .time-controls > span,
+.outcome-log article p, .game-footer, .mission-view-copy > p,
+.map-info-card > p, .mission-facts dt, .mission-facts dd,
+.empty-log, .log-heading > span { color: var(--sg-muted); }
+.game-kicker, .panel-step, .view-overline { color: var(--sg-cyan) !important; }
+.game-kicker { display: flex; align-items: center; gap: 7px; }
+.game-kicker img { width: 21px; height: 20px; object-fit: contain; }
+.game-kicker span { margin-left: 5px; color: var(--sg-muted); font-size: 9px; }
+.game-clock, .game-resources > div, .game-panel, .map-info-card,
+.site-map-wrap, .guide-dialog { border-color: var(--sg-border); background: var(--sg-panel); }
+.game-clock { border-radius: 4px; }
+.game-resources > div, .game-panel, .map-info-card { border-radius: 5px; }
+.game-objective { border-color: var(--sg-border); border-radius: 5px; background: var(--sg-secondary); }
+.objective-steps span { border-color: var(--sg-border); background: var(--sg-deep); color: var(--sg-muted); }
+.objective-steps span.current { border-color: var(--sg-cyan); color: var(--sg-cyan); }
+.objective-steps span.done { border-color: #397558; color: #75d39a; }
+.game-page select { border-color: var(--sg-border); border-radius: 4px; color: var(--sg-text); background: var(--sg-deep); }
+.condition-card, .operation-costs span, .forecast-box, .active-operation,
+.site-map-wrap, .map-info-card { background: var(--sg-deep); }
+.condition-card.sun-data span, .condition-card.sun-data strong,
+.forecast-box .sun-data, .live-conditions .sun-data { color: var(--sg-sun); }
+.condition-card.earth-data span, .condition-card.earth-data strong,
+.forecast-box .earth-data, .live-conditions .earth-data { color: var(--sg-earth); }
+.game-button { border-color: var(--sg-border); border-radius: 4px; color: var(--sg-text); background: var(--sg-secondary); }
+.game-button:hover:not(:disabled) { border-color: var(--sg-cyan); color: var(--sg-cyan-hover); background: #20203a; }
+.game-button:focus-visible, .view-tabs button:focus-visible { outline: 2px solid var(--sg-cyan); outline-offset: 2px; }
+.game-button.primary { border-color: var(--sg-cyan); color: #061016; background: var(--sg-cyan); }
+.game-button.primary:hover:not(:disabled) { border-color: var(--sg-cyan-hover); color: #050b10; background: var(--sg-cyan-hover); }
+.view-tabs { border-color: var(--sg-border); border-radius: 4px; background: var(--sg-deep); }
+.view-tabs button { color: var(--sg-muted); }
+.view-tabs button.active { color: var(--sg-cyan); background: var(--sg-secondary); }
+.mission-progress-track span { background: var(--sg-cyan); }
+.route-base { stroke: #45455a; }
+.route-progress { stroke: var(--sg-cyan); }
+.route-stop { fill: var(--sg-cyan); }
+.earth-disc { fill: #172c47; stroke: var(--sg-earth); }
+.earth-grid { stroke: var(--sg-earth); }
+.moon-disc { fill: #92929f; stroke: #d0d0df; }
+.craft-marker path { fill: var(--sg-cyan); }
+.craft-marker circle { fill: var(--sg-deep); }
+.space-label, .route-label { fill: var(--sg-muted); }
+.live-conditions { border-color: var(--sg-border); }
+.live-conditions span { color: var(--sg-muted); }
+.live-conditions b { color: var(--sg-text); }
+.map-outline { fill: #0b0b14; stroke: var(--sg-border); }
+.map-graticule { stroke: #222233; }
+.map-site-dot { fill: #24728d; stroke: var(--sg-cyan); }
+.map-site.selected .map-site-dot { fill: var(--sg-cyan); stroke: #e0faff; }
+.map-site.inspected .map-hit-area { fill: #4cc9f01a; stroke: var(--sg-cyan); }
+.map-site-name, .map-transit { fill: var(--sg-muted); }
+.map-robot { fill: var(--sg-cyan); stroke: #d9f8ff; }
+.map-beacon { stroke: var(--sg-cyan); }
+.map-warning.recommended { fill: var(--sg-sun); }
+.map-warning.required { fill: #ff5f56; }
+.maintenance-status { background: #101a15; }
+.maintenance-status strong, .resource-condition.healthy strong { color: #75d39a; }
+.maintenance-status.recommended { background: #211b0d; }
+.maintenance-status.recommended strong, .action-hint { color: var(--sg-sun); }
+.maintenance-status.required, .warning-critical { background: #241210; }
+.maintenance-status.required strong, .warning-critical { color: #ff776e !important; }
+.mission-success { border-color: #397558; border-radius: 4px; background: #101a15; }
+.mission-success strong { color: #75d39a; }
+.timeline-track { background: var(--sg-deep); }
+.timeline-track span { background: var(--sg-cyan); }
+.outcome-log { border-color: var(--sg-border); }
+.outcome-log article { border-color: #242436; }
+.outcome-log article strong { color: var(--sg-cyan); }
+.guide-backdrop { background: #050505e8; }
+.guide-dialog { border-radius: 5px; box-shadow: none; }
+.guide-dialog > p, .guide-dialog ol { color: var(--sg-muted); }
+.guide-dialog li strong { color: var(--sg-text); }
+.guide-dialog .guide-caveat { border-color: var(--sg-sun); background: #1a1a2e; color: var(--sg-muted); }
+.game-clock strong, .site-coordinates, .condition-card strong, .condition-card small,
+.mission-facts dd, .operation-costs strong, .forecast-box span,
+.live-conditions, .outcome-log article span, .game-clock span:first-child,
+.site-map, .timeline-track { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.condition-card strong { font-size: 14px; }
