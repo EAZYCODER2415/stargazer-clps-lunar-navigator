@@ -1,0 +1,87 @@
+--- a/backend/ephemeris_fetch.py
++++ b/backend/ephemeris_fetch.py
+@@ -8,6 +8,9 @@
+ 
+ Optional: python backend/ephemeris_fetch.py <days> <output_folder>
+   e.g.    python backend/ephemeris_fetch.py 29.53 my_folder   (one lunar day only)
++          python backend/ephemeris_fetch.py --sphere-altitude  (observer at altitude 0 for every site, as before)
++By default each site's altitude is its LOLA ground height from frontend/src/data/horizon/<site>.json
++(0.0 when that file is missing). The altitude used is written into each output file.
+ The default output folder and the frontend data files are found from this file's location,
+ so the script works from any working directory. A folder given on the command line is
+ relative to where you run it.
+@@ -18,16 +21,20 @@
+ 
+ API = "https://ssd.jpl.nasa.gov/api/horizons.api"
+ START = "2026-12-01 00:00"       # change to the scenario start date
+-DAYS = float(sys.argv[1]) if len(sys.argv) > 1 else 118.2   # default: 4 synodic months (4 lunar days)
++_ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
++USE_SITE_ALTITUDE = "--sphere-altitude" not in sys.argv    # --sphere-altitude = altitude 0 for every site (original behaviour)
++DAYS = float(_ARGS[0]) if len(_ARGS) > 0 else 118.2   # default: 4 synodic months (4 lunar days)
+ REPO_ROOT = Path(__file__).resolve().parent.parent      # this file lives in backend/
+-OUT_DIR = sys.argv[2] if len(sys.argv) > 2 else str(REPO_ROOT / "ephemeris_long")
++OUT_DIR = _ARGS[1] if len(_ARGS) > 1 else str(REPO_ROOT / "ephemeris_long")
+ STEP = "1h"
+ 
+ # Fact-checked 14 Nov 2026 (sources in comments).
+ # lon = EAST-positive degrees (0-360 ok), lat = degrees (south = negative),
+ # alt_km = site height above the 1737.4 km reference sphere.
+-# TODO (Liam/LOLA): fill in real alt_km. 0 = flat sphere, which UNDER-estimates
+-# Sun/Earth time on these peaks (Malapert and Mons Mouton rise ~5-6 km).
++# alt_km here is only the fallback. site_altitude_km() below replaces it with the LOLA ground
++# height when the site's horizon file exists. Terrain blocking is NOT handled here: that is the
++# horizon mask's job. Altitude only moves the observer, which shifts the Earth's direction by
++# at most (height / distance), under 0.001 degrees for a 5.3 km peak.
+ SITES = [
+     # Malapert Massif - Artemis III candidate region. Inside LROC's Malapert NAC
+     # mosaic bounds (lat -86.33..-85.63, lon -5.66..5.15).
+@@ -42,6 +49,21 @@
+ BODIES = {"sun": "10", "earth": "399"}
+ FRONTEND_SITE_MANIFEST = REPO_ROOT / "frontend" / "src" / "data" / "landingSites.json"
+ FRONTEND_EPHEMERIS_DIR = REPO_ROOT / "frontend" / "src" / "data" / "ephemeris"
++FRONTEND_HORIZON_DIR = REPO_ROOT / "frontend" / "src" / "data" / "horizon"
++
++
++def site_altitude_km(site):
++    """
++    Observer altitude in km above the 1737.4 km reference sphere: the LOLA ground height written by
++    lola_terrain.py (observer.ground_height_m) when the site's horizon file exists, else site["alt_km"].
++    """
++    horizon_file = FRONTEND_HORIZON_DIR / f"{site['id']}.json"
++    if USE_SITE_ALTITUDE and horizon_file.exists():
++        with horizon_file.open(encoding="utf-8") as source:
++            ground_m = json.load(source).get("observer", {}).get("ground_height_m")
++        if ground_m is not None:
++            return round(ground_m / 1000, 4)
++    return site["alt_km"]
+ 
+ 
+ def calculate_sun_position(time, latitude, longitude):
+@@ -118,8 +140,11 @@
+         output.write("\n")
+ 
+ 
+-def calculate_longest_sun_earth_overlap(sun_rows, earth_rows, step_hours):
+-    """Return the longest contiguous window where both bodies are above the horizon."""
++def calculate_longest_sun_earth_overlap_flat_horizon(sun_rows, earth_rows, step_hours):
++    """
++    Return the longest contiguous window where both bodies are above a FLAT horizon (elevation > 0).
++    This ignores terrain. The terrain-aware best overlap comes from the database (backend/scripts/build_db.py).
++    """
+     mission_rows = round(29.53 * 24 / step_hours)
+     sun_rows = sun_rows[:mission_rows]
+     earth_rows = earth_rows[:mission_rows]
+@@ -151,10 +176,11 @@
+     os.makedirs(OUT_DIR, exist_ok=True)
+     FRONTEND_EPHEMERIS_DIR.mkdir(parents=True, exist_ok=True)
+     for site in SITES:
+-        data = {"site": site, "start": START, "step_h": 1}
++        site = dict(site, alt_km=site_altitude_km(site))
++        data = {"site": site, "start": START, "step_h": 1, "observer_alt_km_used": site["alt_km"]}
+         for name, bid in BODIES.items():
+             data[name] = fetch(bid, site)
+-        data["best_overlap"] = calculate_longest_sun_earth_overlap(
++        data["best_overlap_flat_horizon"] = calculate_longest_sun_earth_overlap_flat_horizon(
+             data["sun"], data["earth"], data["step_h"]
+         )
+         path = f"{OUT_DIR}/{site['id']}.json"
