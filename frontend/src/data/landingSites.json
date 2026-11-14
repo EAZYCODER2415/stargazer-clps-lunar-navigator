@@ -1,0 +1,20 @@
+[
+  {
+    "id": "malapert",
+    "name": "Malapert Mountain / Massif",
+    "latitude": -85.99,
+    "longitude": 2.93
+  },
+  {
+    "id": "shackleton",
+    "name": "Shackleton Rim (connecting ridge)",
+    "latitude": -89.684,
+    "longitude": 196.739
+  },
+  {
+    "id": "mons-mouton",
+    "name": "Mons Mouton (IM-2 site)",
+    "latitude": -84.7906,
+    "longitude": 29.1957
+  }
+]

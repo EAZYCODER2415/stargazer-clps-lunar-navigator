@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import {
   calculateEarthPosition,
   calculateSunPosition
-} from '../utils/ephemeris';
+} from '../utils/ephemerisRuntime';
 
 const DEG_TO_RAD = Math.PI / 180;
 const CAMERA_HEIGHT = 1.8;
