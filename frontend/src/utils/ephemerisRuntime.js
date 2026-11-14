@@ -119,13 +119,18 @@ export const getSkyPath = (startTime, positionCalculator, latitude, longitude) =
   })
 );
 
-export const findNextHorizonTransition = (time, positionCalculator, latitude, longitude) => {
+/**
+ * The next rise or set after `time`, searched in half-hour steps. With `endTime` the search stops
+ * there and returns null if the body does not cross the skyline before it.
+ */
+export const findNextHorizonTransition = (time, positionCalculator, latitude, longitude, endTime = null) => {
   const initialVisible = clearanceOf(positionCalculator(time, latitude, longitude), latitude, longitude) > 0;
   const stepMs = 30 * 60 * 1000;
   const maxSteps = 29.53 * 24 * 2;
 
   for (let step = 1; step <= maxSteps; step += 1) {
     const candidateTime = new Date(time.getTime() + step * stepMs);
+    if (endTime && candidateTime > endTime) return null;
     const visible = clearanceOf(positionCalculator(candidateTime, latitude, longitude), latitude, longitude) > 0;
     if (visible !== initialVisible) {
       return {
