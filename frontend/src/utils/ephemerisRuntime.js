@@ -98,6 +98,7 @@ export const azElToCartesian = (azimuth, elevation) => {
 
 export const isAboveHorizon = (elevation, horizonMask = 0) => elevation > horizonMask;
 
+<<<<<<< HEAD
 /**
  * The skyline for a site: 360 elevation angles in degrees, one per whole degree of azimuth.
  * terrain = true uses the LOLA mask (the real ridges and dips around the site);
@@ -145,6 +146,49 @@ export const findNextHorizonTransition = (
       if (direction === 'any' || direction === kind) {
         return { time: candidateTime, visible, kind, hours: (ms - time.getTime()) / 3600000 };
       }
+=======
+/** Skyline for a site: 360 angles in degrees, one per degree of azimuth. terrain=false gives a flat horizon. */
+export const getHorizonMask = (latitude, longitude, terrain = true) => (
+  (terrain && HORIZONS[findSite(latitude, longitude).site.id]?.mask_deg) || FLAT_MASK
+);
+
+/** Skyline elevation at any azimuth (interpolated between whole degrees). */
+export const horizonAt = (latitude, longitude, azimuth, terrain = true) => {
+  const mask = getHorizonMask(latitude, longitude, terrain);
+  const wrapped = ((azimuth % 360) + 360) % 360;
+  const lower = Math.floor(wrapped) % 360;
+  const fraction = wrapped - Math.floor(wrapped);
+  return mask[lower] * (1 - fraction) + mask[(lower + 1) % 360] * fraction;
+};
+
+/** Degrees between a body and the skyline below it. Positive = visible. */
+export const clearanceOf = (position, latitude, longitude, terrain = true) => (
+  position.elevation - horizonAt(latitude, longitude, position.azimuth, terrain)
+);
+
+/** Hourly az/el samples for one body over the lunar day (used to draw sky paths). */
+export const getSkyPath = (startTime, positionCalculator, latitude, longitude) => (
+  Array.from({ length: Math.floor(29.53 * 24) + 1 }, (_, hour) => {
+    const time = new Date(startTime.getTime() + hour * 3600000);
+    return { time, ...positionCalculator(time, latitude, longitude) };
+  })
+);
+
+export const findNextHorizonTransition = (time, positionCalculator, latitude, longitude) => {
+  const initialVisible = clearanceOf(positionCalculator(time, latitude, longitude), latitude, longitude) > 0;
+  const stepMs = 30 * 60 * 1000;
+  const maxSteps = 29.53 * 24 * 2;
+
+  for (let step = 1; step <= maxSteps; step += 1) {
+    const candidateTime = new Date(time.getTime() + step * stepMs);
+    const visible = clearanceOf(positionCalculator(candidateTime, latitude, longitude), latitude, longitude) > 0;
+    if (visible !== initialVisible) {
+      return {
+        time: candidateTime,
+        visible,
+        hours: (candidateTime.getTime() - time.getTime()) / 3600000
+      };
+>>>>>>> main
     }
     previousVisible = visible;
   }
@@ -235,7 +279,7 @@ export const getVisibilitySummary = (startTime, positionCalculator, latitude, lo
 
   for (let index = 0; index < sampleCount; index += 1) {
     const sampleTime = new Date(startTime.getTime() + (index / sampleCount) * durationMs);
-    const visible = isAboveHorizon(positionCalculator(sampleTime, latitude, longitude).elevation);
+    const visible = clearanceOf(positionCalculator(sampleTime, latitude, longitude), latitude, longitude) > 0;
     const sampleHours = 29.53 * 24 / sampleCount;
     if (visible) {
       visibleHours += sampleHours;
@@ -257,7 +301,11 @@ export const getVisibilityBands = (startTime, positionCalculator, latitude, long
   for (let index = 0; index <= sampleCount; index += 1) {
     const sampleTime = new Date(startTime.getTime() + (index / sampleCount) * 29.53 * 86400000);
     const visible = index < sampleCount
+<<<<<<< HEAD
       && clearanceOf(positionCalculator(sampleTime, latitude, longitude), latitude, longitude, terrain) > 0;
+=======
+      && clearanceOf(positionCalculator(sampleTime, latitude, longitude), latitude, longitude) > 0;
+>>>>>>> main
 
     if (visible && bandStart === null) bandStart = index;
     if ((!visible || index === sampleCount) && bandStart !== null) {

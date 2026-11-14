@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import '../styles/lunarScene.css';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
   calculateEarthPosition,
   calculateSunPosition,
@@ -20,6 +22,11 @@ const MAST_HEIGHT = 3;             // POV camera sits on the lander's sensor mas
 const EYE_Y = MOUND_HEIGHT + MAST_HEIGHT;
 const SKY_RADIUS = 4000;           // Sun, Earth, paths and grid live on this sphere
 const TERRAIN_HALF = 200;
+// Sun shadows: a fine map over the ground near the lander, where rocks and crater rims are close enough to read.
+const SHADOW_MAP_SIZE = 2048;      // holds 60 fps on integrated laptop graphics
+const SHADOW_HALF = 60;
+const SHADOW_NEAR = 1;
+const SHADOW_FAR = 900;
 const SKYLINE_RADIUS = 3800;       // the far terrain is drawn as a shell just inside the Sun and Earth
 
 // Real angular radii: Sun 0.27°, Earth 0.95° as seen from the Moon. Drawn larger so they read on screen.
@@ -123,8 +130,73 @@ const createTerrainModel = (siteId, lowestSkylineDeg = 0) => {
   return { heightAt, style };
 };
 
+/** Noise that repeats every `period` cells, so the texture built from it tiles without seams. */
+const tileNoise = (x, y, period, seed) => {
+  const wrap = (value) => ((value % period) + period) % period;
+  const xi = Math.floor(x); const yi = Math.floor(y);
+  const xf = smooth(x - xi); const yf = smooth(y - yi);
+  const a = hash2(wrap(xi), wrap(yi), seed); const b = hash2(wrap(xi + 1), wrap(yi), seed);
+  const c = hash2(wrap(xi), wrap(yi + 1), seed); const d = hash2(wrap(xi + 1), wrap(yi + 1), seed);
+  return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
+};
+
+/**
+ * Regolith grain: fine clumps, speckle and a scatter of tiny pits. Used both as the
+ * surface colour and as a bump map, so low sunlight picks out the texture of the dust.
+ * Only small features are drawn here, so the repeat is not visible; large-scale tone
+ * comes from the terrain's vertex colours.
+ */
+const createRegolithTexture = (seed) => {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const context = canvas.getContext('2d');
+  const image = context.createImageData(size, size);
+  const values = new Float32Array(size * size);
+  for (let py = 0; py < size; py += 1) {
+    for (let px = 0; px < size; px += 1) {
+      const u = px / size; const v = py / size;
+      const clumps = 0.5 * tileNoise(u * 12, v * 12, 12, seed)
+        + 0.3 * tileNoise(u * 32, v * 32, 32, seed + 3)
+        + 0.2 * tileNoise(u * 96, v * 96, 96, seed + 7);
+      values[py * size + px] = 0.76 + 0.22 * clumps + 0.02 * hash2(px, py, seed + 11);
+    }
+  }
+  // Tiny pits (centimetre to half-metre craterlets), wrapped across the tile edges.
+  const random = seededRandom(seed + 57);
+  for (let pit = 0; pit < 70; pit += 1) {
+    const cx = random() * size; const cy = random() * size;
+    const radius = 2 + random() * random() * 16;
+    const reach = Math.ceil(radius * 1.5);
+    for (let dy = -reach; dy <= reach; dy += 1) {
+      for (let dx = -reach; dx <= reach; dx += 1) {
+        const d = Math.hypot(dx, dy) / radius;
+        if (d < 1.5) {
+          const bowl = d < 1 ? -0.16 * (1 - d * d) : 0;
+          const rim = 0.05 * Math.exp(-(((d - 1) / 0.25) ** 2));
+          const x = ((Math.round(cx) + dx) % size + size) % size;
+          const y = ((Math.round(cy) + dy) % size + size) % size;
+          values[y * size + x] += bowl + rim;
+        }
+      }
+    }
+  }
+  for (let index = 0; index < values.length; index += 1) {
+    const level = Math.round(255 * Math.min(1, Math.max(0, values[index])));
+    image.data[index * 4] = level; image.data[index * 4 + 1] = level;
+    image.data[index * 4 + 2] = level; image.data[index * 4 + 3] = 255;
+  }
+  context.putImageData(image, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(30, 30);            // one tile is about 13 m of ground
+  texture.anisotropy = 8;                // the ground is always seen at a shallow angle
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+};
+
 const createTerrainMesh = (heightAt, seed) => {
-  const segments = 180;
+  const segments = 300;
   const geometry = new THREE.PlaneGeometry(TERRAIN_HALF * 2, TERRAIN_HALF * 2, segments, segments);
   geometry.rotateX(-Math.PI / 2);
   const position = geometry.attributes.position;
@@ -132,14 +204,20 @@ const createTerrainMesh = (heightAt, seed) => {
   for (let index = 0; index < position.count; index += 1) {
     const x = position.getX(index); const z = position.getZ(index);
     position.setY(index, heightAt(x, z));
-    const shade = 0.2 + fbm(x * 0.08, z * 0.08, seed + 3, 3) * 0.2;   // lunar regolith is dark grey
-    colors[index * 3] = shade * 1.02;
+    // Broad tone patches: lunar regolith is dark grey, a little lighter where it is fresher.
+    const shade = 0.23 + fbm(x * 0.05, z * 0.05, seed + 3, 4) * 0.2;
+    colors[index * 3] = shade * 1.03;
     colors[index * 3 + 1] = shade;
-    colors[index * 3 + 2] = shade * 0.97;
+    colors[index * 3 + 2] = shade * 0.96;
   }
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  const grain = createRegolithTexture(seed);
+  // Matte (Lambert) shading: dust scatters light evenly. A glossy model would put a false
+  // sheen on the ground whenever you look towards the low Sun.
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({
+    vertexColors: true, map: grain, bumpMap: grain, bumpScale: 0.015
+  }));
   mesh.receiveShadow = true;
   mesh.castShadow = true;
   return mesh;
@@ -165,19 +243,42 @@ const createSurveyGrid = (heightAt) => {
   );
 };
 
+/** A lumpy boulder: a subdivided sphere pushed in and out by noise, with smooth shading. */
+const createRockGeometry = (seed) => {
+  const base = new THREE.IcosahedronGeometry(1, 2);
+  base.deleteAttribute('uv'); base.deleteAttribute('normal');
+  const geometry = mergeVertices(base);
+  base.dispose();
+  const position = geometry.attributes.position;
+  const vertex = new THREE.Vector3();
+  for (let index = 0; index < position.count; index += 1) {
+    vertex.fromBufferAttribute(position, index);
+    const lump = 0.62 + 0.75 * fbm(vertex.x * 1.4 + vertex.z * 0.8 + 9, vertex.y * 1.4 - vertex.z * 0.6 + 9, seed, 3);
+    vertex.multiplyScalar(lump);
+    position.setXYZ(index, vertex.x, vertex.y, vertex.z);
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+};
+
 const createRocks = (heightAt, seed) => {
   const random = seededRandom(seed + 101);
   const group = new THREE.Group();
-  const material = new THREE.MeshLambertMaterial({ color: 0x8d8983, flatShading: true });
-  for (let index = 0; index < 70; index += 1) {
+  const shapes = Array.from({ length: 6 }, (_, index) => createRockGeometry(seed + 200 + index * 17));
+  const materials = [0x6f6b66, 0x7b7771, 0x64615d].map((color) => (
+    new THREE.MeshLambertMaterial({ color })
+  ));
+  for (let index = 0; index < 110; index += 1) {
     const angle = random() * Math.PI * 2;
     const distance = 7 + random() * random() * 110;
-    const size = 0.15 + random() * random() * 1.3;
-    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(size, 0), material);
+    const size = 0.1 + random() * random() * random() * 1.6;
+    const rock = new THREE.Mesh(shapes[index % shapes.length], materials[index % materials.length]);
     const x = Math.cos(angle) * distance; const z = Math.sin(angle) * distance;
-    rock.position.set(x, heightAt(x, z) + size * 0.35, z);
-    rock.rotation.set(random() * 3, random() * 3, random() * 3);
-    rock.scale.y = 0.6 + random() * 0.5;
+    const squash = 0.5 + random() * 0.4;
+    rock.scale.set(size * (0.8 + random() * 0.5), size * squash, size * (0.8 + random() * 0.5));
+    // Sit each rock partly in the dust, as real boulders do, so it does not look placed on top.
+    rock.position.set(x, heightAt(x, z) + size * squash * 0.3, z);
+    rock.rotation.y = random() * Math.PI * 2;
     rock.castShadow = true;
     rock.receiveShadow = true;
     group.add(rock);
@@ -379,47 +480,52 @@ const createEarthTextures = () => {
   return { surface: toTexture(surface), clouds: toTexture(clouds) };
 };
 
-const createGridLabel = (text, color) => {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 64;
-  const context = canvas.getContext('2d');
-  context.font = '700 28px monospace';
-  context.fillStyle = color;
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(text, canvas.width / 2, canvas.height / 2);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: new THREE.CanvasTexture(canvas),
-    transparent: true,
-    depthWrite: false
-  }));
-  sprite.scale.set(2.6, 0.65, 1);
-  return sprite;
-};
-
-const createSceneGridLabels = () => {
-  const group = new THREE.Group();
-  for (let azimuth = 0; azimuth < 360; azimuth += 30) {
-    const label = createGridLabel(`${azimuth}°`, '#cbd5e1');
-    label.position.copy(celestialPosition(azimuth, 0, 29.5, 0));
-    group.add(label);
-  }
-  [-10, -5, 0, 5, 10].forEach((distance) => {
-    const label = createGridLabel(`${distance + 10} km`, '#94a3b8');
-    label.position.set(distance, 0.12, -6.5);
-    group.add(label);
-  });
-  return group;
-};
-
-const createCrater = (radius, depth, x, z) => {
-  const geometry = new THREE.CircleGeometry(radius, 32);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x343b4c,
-    transparent: true,
-    opacity: 0.62,
-    side: THREE.DoubleSide
+/** Earth with a real day/night terminator: it is lit from the Sun's direction even when the Sun is below our horizon. */
+const createEarth = () => {
+  const textures = createEarthTextures();
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uSurface: { value: textures.surface },
+      uClouds: { value: textures.clouds },
+      uSunDirection: { value: new THREE.Vector3(1, 0, 0) },
+      uCloudShift: { value: 0 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPosition;
+      void main() {
+        vUv = uv;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uSurface;
+      uniform sampler2D uClouds;
+      uniform vec3 uSunDirection;
+      uniform float uCloudShift;
+      varying vec2 vUv;
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPosition;
+      void main() {
+        vec3 normal = normalize(vWorldNormal);
+        float light = dot(normal, normalize(uSunDirection));
+        float day = smoothstep(-0.08, 0.22, light);
+        vec3 surface = texture2D(uSurface, vUv).rgb;
+        float cloud = texture2D(uClouds, vec2(vUv.x + uCloudShift, vUv.y)).a;
+        vec3 lit = mix(surface, vec3(1.0), cloud * 0.85) * (0.25 + 0.95 * max(light, 0.0));
+        vec3 night = vec3(0.012, 0.02, 0.045) + surface * 0.02;
+        vec3 color = mix(night, lit, day);
+        vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+        float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.6);
+        color += vec3(0.25, 0.55, 1.0) * rim * (0.15 + 0.85 * day);
+        gl_FragColor = vec4(color, 1.0);
+        #include <colorspace_fragment>
+      }
+    `
   });
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(EARTH_RADIUS, 64, 48), material);
   const tilt = new THREE.Group();   // 23.4° axial tilt; the mesh spins inside it
@@ -525,7 +631,7 @@ const disposeObject = (object) => {
   object.traverse((child) => {
     child.geometry?.dispose();
     const materials = Array.isArray(child.material) ? child.material : [child.material];
-    materials.filter(Boolean).forEach((material) => { material.map?.dispose(); material.dispose(); });
+    materials.filter(Boolean).forEach((material) => { material.map?.dispose(); material.bumpMap?.dispose(); material.dispose(); });
   });
 };
 
@@ -586,16 +692,20 @@ const LunarScene3D = ({
     // Sunlight: direction and strength are set from the ephemeris on every update.
     const sunLight = new THREE.DirectionalLight(0xfff4e0, 0);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.set(2048, 2048);
-    Object.assign(sunLight.shadow.camera, { left: -90, right: 90, top: 90, bottom: -90, near: 1, far: 900 });
-    sunLight.shadow.bias = -0.0006;
-    sunLight.shadow.normalBias = 0.35;
+    sunLight.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    Object.assign(sunLight.shadow.camera, {
+      left: -SHADOW_HALF, right: SHADOW_HALF, top: SHADOW_HALF, bottom: -SHADOW_HALF, near: SHADOW_NEAR, far: SHADOW_FAR
+    });
+    sunLight.shadow.normalBias = 0.25;   // the depth bias is set per Sun angle in the time update below
     sunLight.target.position.set(0, MOUND_HEIGHT, 0);
     scene.add(sunLight, sunLight.target);
     // Earthshine: faint blue fill from Earth's direction, so night is dark but not blind.
     const earthLight = new THREE.DirectionalLight(0x8fb4ff, 0);
     scene.add(earthLight);
-    scene.add(new THREE.HemisphereLight(0x9fb2d8, 0x30343c, 0.16));   // starlight: night is dark, not blind
+    // Fill light. At night this is faint starlight. By day it stands in for sunlight bouncing off
+    // the surrounding lit ground, which is why real lunar shadows are dark but not pure black.
+    const fillLight = new THREE.HemisphereLight(0x9fb2d8, 0x30343c, 0.16);
+    scene.add(fillLight);
 
     const stars = createStars();
     scene.add(stars);
@@ -710,7 +820,7 @@ const LunarScene3D = ({
     canvas.addEventListener('wheel', onWheel, { passive: false });
 
     stageRef.current = {
-      scene, camera, renderer, orbit, sunLight, earthLight, stars, sun, sunGlow, earth,
+      scene, camera, renderer, orbit, sunLight, earthLight, fillLight, stars, sun, sunGlow, earth,
       skyGrid, sunPath, sunTrail, earthPath, earthTrail, linkBeam,
       lander, dishMount, sensorHead, workLight, mode: null, keyLightAzimuth: 0
     };
@@ -844,11 +954,23 @@ const LunarScene3D = ({
     // Sunlight fades in as the real 0.53°-wide disc clears the skyline.
     const sunFraction = Math.max(0, Math.min(1, (sunClearance + 0.265) / 0.53));
     stage.sunLight.position.copy(sunDirection.clone().multiplyScalar(420).add(new THREE.Vector3(0, MOUND_HEIGHT, 0)));
-    stage.sunLight.intensity = 34 * sunFraction;
+    // Auto-exposure, as a camera would do: the ground gets several times more light at 6° of Sun
+    // than at 1.5°, so ease the light back as the Sun climbs to keep the dust grey, not blown out.
+    const sunHeight = Math.sin(Math.max(1.5, sunPosition.elevation) * DEG);
+    const exposure = (Math.sin(1.5 * DEG) / sunHeight) ** 0.75;
+    stage.sunLight.intensity = 28 * sunFraction * exposure;
+    // Shadow bias scaled to the Sun's angle. Light that grazes the ground crosses a lot of depth inside
+    // one shadow-map pixel, so a fixed bias either speckles the ground (too small) or eats the shadows (too big).
+    const grazing = Math.tan(Math.max(1, sunPosition.elevation - 2) * DEG);
+    const texel = (SHADOW_HALF * 2) / SHADOW_MAP_SIZE;
+    stage.sunLight.shadow.bias = -(1.3 * texel / grazing) / (SHADOW_FAR - SHADOW_NEAR);
     stage.sunLight.castShadow = sunFraction > 0;
     const earthUp = earthClearance > 0;
     stage.earthLight.position.copy(earthDirection.clone().multiplyScalar(300));
-    stage.earthLight.intensity = earthUp ? 0.5 : 0;
+    stage.earthLight.intensity = earthUp ? 1.1 : 0;
+    stage.fillLight.intensity = 0.16 + 1.0 * sunFraction;
+    stage.fillLight.color.setHex(sunFraction > 0 ? 0xb9b4ab : 0x9fb2d8);
+    stage.fillLight.groundColor.setHex(sunFraction > 0 ? 0x8a857c : 0x30343c);
     stage.workLight.children.forEach((lamp) => { lamp.intensity = 30 * lamp.userData.share * (1 - sunFraction); });
     stage.stars.material.opacity = 1 - 0.72 * sunFraction;
 
