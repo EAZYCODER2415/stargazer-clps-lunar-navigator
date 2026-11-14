@@ -9,7 +9,10 @@ const Header = ({
   onSiteChange,
   viewMode,
   onViewModeChange,
-  onSettingsClick
+  onSettingsClick,
+  verdict,
+  sunVisibleHours,
+  earthVisibleHours
 }) => {
   const [isSiteMenuOpen, setIsSiteMenuOpen] = useState(false);
   const sun = calculateSunPosition(time, selectedSite.latitude, selectedSite.longitude);
@@ -23,6 +26,13 @@ const Header = ({
 
   return (
     <header className="mission-header">
+      <div className="mission-verdict mission-header-verdict" role="status">
+        <strong>{verdict}</strong>
+        <span>
+          {sunVisibleHours.toFixed(0)} h Sun / {earthVisibleHours.toFixed(0)} h Earth visible in this 29.53-day lunar day
+          {' · '}Celestial disc sizes exaggerated for visibility
+        </span>
+      </div>
       <div className="mission-header-brand">
         <div>
           <h1>Stargazer</h1>

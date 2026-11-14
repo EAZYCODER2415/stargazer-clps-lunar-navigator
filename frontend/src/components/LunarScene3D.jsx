@@ -667,7 +667,7 @@ const LunarScene3D = ({
                       <path className="azimuth-trail-earth" d={overlayEarthTrail} />
                     </>
                   )}
-                  <circle className="azimuth-moon" cx="50" cy="50" r="18" />
+                  <circle className="azimuth-moon" cx="50" cy="50" r="10" />
                   {showSolarFlux && <circle className="azimuth-point-sun" cx={overlaySunPoint.x} cy={overlaySunPoint.y} r="2.2" />}
                   {showDTELink && <circle className="azimuth-point-earth" cx={overlayEarthPoint.x} cy={overlayEarthPoint.y} r="2.4" />}
                 </svg>

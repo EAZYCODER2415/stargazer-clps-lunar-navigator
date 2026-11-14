@@ -192,14 +192,10 @@ function App() {
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               onSettingsClick={() => setActiveTool('canvas-settings')}
+              verdict={verdict}
+              sunVisibleHours={sunSummary.visibleHours}
+              earthVisibleHours={earthSummary.visibleHours}
             />
-            <div className="mission-verdict" role="status">
-              <strong>{verdict}</strong>
-              <span>
-                {sunSummary.visibleHours.toFixed(0)} h Sun / {earthSummary.visibleHours.toFixed(0)} h Earth visible in this 29.53-day lunar day
-                {' · '}Celestial disc sizes exaggerated for visibility
-              </span>
-            </div>
           </>
         )}
         <CameraControls
