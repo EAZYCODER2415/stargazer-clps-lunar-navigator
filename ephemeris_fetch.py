@@ -4,13 +4,17 @@ Output: one JSON per site in ./ephemeris/  (this is the "already-calculated" eph
 
 Run:  pip install requests  &&  python ephemeris_fetch.py
 No API key needed.
+
+Optional: python ephemeris_fetch.py <days> <output_folder>
+  e.g.    python ephemeris_fetch.py 118.2 ephemeris_long   (4 lunar days, for the multi-month cost model)
 """
-import json, os, requests
+import json, os, sys, requests
 from datetime import datetime, timedelta
 
 API = "https://ssd.jpl.nasa.gov/api/horizons.api"
 START = "2026-12-01 00:00"       # change to the scenario start date
-DAYS = 29.53                     # one synodic month = one lunar day
+DAYS = float(sys.argv[1]) if len(sys.argv) > 1 else 29.53   # default: one synodic month = one lunar day
+OUT_DIR = sys.argv[2] if len(sys.argv) > 2 else "ephemeris"
 STEP = "1h"
 
 # Fact-checked 14 Nov 2026 (sources in comments).
@@ -61,12 +65,12 @@ def fetch(body_id, site):
 
 
 def main():
-    os.makedirs("ephemeris", exist_ok=True)
+    os.makedirs(OUT_DIR, exist_ok=True)
     for site in SITES:
         data = {"site": site, "start": START, "step_h": 1}
         for name, bid in BODIES.items():
             data[name] = fetch(bid, site)
-        path = f"ephemeris/{site['id']}.json"
+        path = f"{OUT_DIR}/{site['id']}.json"
         with open(path, "w") as f:
             json.dump(data, f)
         print(f"{path}: {len(data['sun'])} hourly rows")
