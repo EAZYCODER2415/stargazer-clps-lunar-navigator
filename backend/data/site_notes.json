@@ -1,0 +1,21 @@
+{
+  "_about": "Optional per-site notes loaded by scripts/build_db.py. Keyed by the site id in frontend/src/data/landingSites.json. The notes below are copied from comments in backend/ephemeris_fetch.py; they have no cited source yet, so coordinate_status stays 'unverified'. To mark a site verified, set coordinate_source to the citation and coordinate_status to 'verified'.",
+  "malapert": {
+    "region_note": "Artemis III candidate region. Inside LROC's Malapert NAC mosaic bounds (lat -86.33..-85.63, lon -5.66..5.15). (repo comment)",
+    "mission_context": null,
+    "coordinate_source": null,
+    "coordinate_status": "unverified"
+  },
+  "shackleton": {
+    "region_note": "Shackleton rim at the Shackleton-de Gerlache ridge junction, NOT the crater centre (89.67 S, 129.78 E), which is a 4.2 km deep shadowed floor. (repo comment)",
+    "mission_context": null,
+    "coordinate_source": null,
+    "coordinate_status": "unverified"
+  },
+  "mons-mouton": {
+    "region_note": "Artemis III candidate region. (repo comment)",
+    "mission_context": "IM-2 Athena touchdown (CLPS, 6 Mar 2025). (repo comment)",
+    "coordinate_source": null,
+    "coordinate_status": "unverified"
+  }
+}

@@ -1,0 +1,480 @@
+{
+  "site_id": "shackleton",
+  "name": "Shackleton Rim (connecting ridge)",
+  "dataset_build_id": "sg-8db7fb77e1eb",
+  "caveat": "Geometric visibility, not power or link budget. Costs are distributions under stated assumptions, not mission-grade estimates.",
+  "horizon_models": {
+    "lola_mask": {
+      "mask_interpolation": "linear_between_bins",
+      "sigma_deg": 0.3,
+      "lunar_days": {
+        "0": {
+          "period_start_utc": "2026-12-01T00:00:00Z",
+          "period_end_utc": "2027-03-29T04:00:00Z",
+          "both": {
+            "visible_hours": 1211.47,
+            "longest_window_h": 308.47,
+            "longest_gap_h": 352.45
+          },
+          "best_overlap": {
+            "hours": 308.5,
+            "start_utc": "2026-12-14T16:13:23Z",
+            "end_utc": "2026-12-27T12:41:52Z"
+          },
+          "earth": {
+            "visible_hours": 1218.23,
+            "longest_window_h": 308.47,
+            "longest_gap_h": 352.45
+          },
+          "sun": {
+            "visible_hours": 2435.4,
+            "longest_window_h": 761.26,
+            "longest_gap_h": 136.34
+          }
+        },
+        "1": {
+          "period_start_utc": "2026-12-01T00:00:00Z",
+          "period_end_utc": "2026-12-30T12:43:12Z",
+          "both": {
+            "visible_hours": 308.47,
+            "longest_window_h": 308.47,
+            "longest_gap_h": 328.22
+          },
+          "best_overlap": {
+            "hours": 308.5,
+            "start_utc": "2026-12-14T16:13:23Z",
+            "end_utc": "2026-12-27T12:41:52Z"
+          },
+          "earth": {
+            "visible_hours": 308.47,
+            "longest_window_h": 308.47,
+            "longest_gap_h": 328.22
+          },
+          "sun": {
+            "visible_hours": 708.72,
+            "longest_window_h": 708.72,
+            "longest_gap_h": 0.0
+          }
+        },
+        "2": {
+          "period_start_utc": "2026-12-30T12:43:12Z",
+          "period_end_utc": "2027-01-29T01:26:24Z",
+          "both": {
+            "visible_hours": 303.79,
+            "longest_window_h": 303.79,
+            "longest_gap_h": 272.85
+          },
+          "best_overlap": {
+            "hours": 303.8,
+            "start_utc": "2027-01-10T21:34:28Z",
+            "end_utc": "2027-01-23T13:22:05Z"
+          },
+          "earth": {
+            "visible_hours": 303.79,
+            "longest_window_h": 303.79,
+            "longest_gap_h": 272.85
+          },
+          "sun": {
+            "visible_hours": 676.36,
+            "longest_window_h": 554.48,
+            "longest_gap_h": 19.28
+          }
+        },
+        "3": {
+          "period_start_utc": "2027-01-29T01:26:24Z",
+          "period_end_utc": "2027-02-27T14:09:36Z",
+          "both": {
+            "visible_hours": 302.68,
+            "longest_window_h": 302.68,
+            "longest_gap_h": 219.22
+          },
+          "best_overlap": {
+            "hours": 302.7,
+            "start_utc": "2027-02-07T04:39:43Z",
+            "end_utc": "2027-02-19T19:20:30Z"
+          },
+          "earth": {
+            "visible_hours": 302.68,
+            "longest_window_h": 302.68,
+            "longest_gap_h": 219.22
+          },
+          "sun": {
+            "visible_hours": 587.27,
+            "longest_window_h": 464.71,
+            "longest_gap_h": 64.62
+          }
+        },
+        "4": {
+          "period_start_utc": "2027-02-27T14:09:36Z",
+          "period_end_utc": "2027-03-29T02:52:48Z",
+          "both": {
+            "visible_hours": 296.52,
+            "longest_window_h": 174.01,
+            "longest_gap_h": 239.81
+          },
+          "best_overlap": {
+            "hours": 174.0,
+            "start_utc": "2027-03-06T11:47:31Z",
+            "end_utc": "2027-03-13T17:48:22Z"
+          },
+          "earth": {
+            "visible_hours": 303.28,
+            "longest_window_h": 303.28,
+            "longest_gap_h": 239.81
+          },
+          "sun": {
+            "visible_hours": 463.05,
+            "longest_window_h": 246.5,
+            "longest_gap_h": 136.34
+          }
+        }
+      },
+      "cost": {
+        "horizon_lookup": "linear_between_bins",
+        "landing_time_utc": "2026-12-01T00:00:00Z",
+        "mission_days": 88.7,
+        "trials": 10000,
+        "p_survive_full_mission": 0.001,
+        "p_zero_usable_hours": 0.077,
+        "burn_M_per_usable_h": {
+          "p10": 0.21,
+          "p50": 0.344,
+          "p90": 0.619
+        },
+        "usable_h": {
+          "p10": 295.0,
+          "p50": 310.0,
+          "p90": 639.0
+        },
+        "alive_days": {
+          "p10": 31.9,
+          "p50": 32.3,
+          "p90": 61.7
+        },
+        "histogram": {
+          "bin_edges": [
+            0.1049,
+            0.1248,
+            0.1447,
+            0.1646,
+            0.1845,
+            0.2044,
+            0.2243,
+            0.2442,
+            0.2641,
+            0.284,
+            0.3039,
+            0.3238,
+            0.3437,
+            0.3636,
+            0.3835,
+            0.4034,
+            0.4233,
+            0.4432,
+            0.4631,
+            0.483,
+            0.5029,
+            0.5228,
+            0.5427,
+            0.5626,
+            0.5825,
+            0.6024,
+            0.6223,
+            0.6422,
+            0.6621,
+            0.682,
+            0.7019,
+            0.7218,
+            0.7417,
+            0.7616,
+            0.7816,
+            0.8015,
+            0.8214,
+            0.8413,
+            0.8612,
+            0.8811,
+            0.901
+          ],
+          "counts": [
+            9,
+            10,
+            69,
+            239,
+            437,
+            637,
+            738,
+            728,
+            647,
+            456,
+            363,
+            283,
+            219,
+            193,
+            206,
+            217,
+            259,
+            315,
+            316,
+            329,
+            348,
+            322,
+            280,
+            271,
+            246,
+            209,
+            195,
+            162,
+            129,
+            103,
+            87,
+            55,
+            52,
+            33,
+            27,
+            13,
+            17,
+            5,
+            4,
+            3
+          ]
+        }
+      }
+    },
+    "flat": {
+      "mask_interpolation": "not_applicable",
+      "sigma_deg": 0.3,
+      "lunar_days": {
+        "0": {
+          "period_start_utc": "2026-12-01T00:00:00Z",
+          "period_end_utc": "2027-03-29T04:00:00Z",
+          "both": {
+            "visible_hours": 697.84,
+            "longest_window_h": 295.44,
+            "longest_gap_h": 1082.83
+          },
+          "best_overlap": {
+            "hours": 295.4,
+            "start_utc": "2027-01-11T02:19:26Z",
+            "end_utc": "2027-01-23T09:45:44Z"
+          },
+          "earth": {
+            "visible_hours": 1187.85,
+            "longest_window_h": 302.67,
+            "longest_gap_h": 362.21
+          },
+          "sun": {
+            "visible_hours": 1753.17,
+            "longest_window_h": 1753.17,
+            "longest_gap_h": 1082.83
+          }
+        },
+        "1": {
+          "period_start_utc": "2026-12-01T00:00:00Z",
+          "period_end_utc": "2026-12-30T12:43:12Z",
+          "both": {
+            "visible_hours": 288.55,
+            "longest_window_h": 288.55,
+            "longest_gap_h": 335.56
+          },
+          "best_overlap": {
+            "hours": 288.5,
+            "start_utc": "2026-12-14T23:33:39Z",
+            "end_utc": "2026-12-27T00:06:32Z"
+          },
+          "earth": {
+            "visible_hours": 288.55,
+            "longest_window_h": 288.55,
+            "longest_gap_h": 335.56
+          },
+          "sun": {
+            "visible_hours": 708.72,
+            "longest_window_h": 708.72,
+            "longest_gap_h": 0.0
+          }
+        },
+        "2": {
+          "period_start_utc": "2026-12-30T12:43:12Z",
+          "period_end_utc": "2027-01-29T01:26:24Z",
+          "both": {
+            "visible_hours": 295.44,
+            "longest_window_h": 295.44,
+            "longest_gap_h": 277.6
+          },
+          "best_overlap": {
+            "hours": 295.4,
+            "start_utc": "2027-01-11T02:19:26Z",
+            "end_utc": "2027-01-23T09:45:44Z"
+          },
+          "earth": {
+            "visible_hours": 295.44,
+            "longest_window_h": 295.44,
+            "longest_gap_h": 277.6
+          },
+          "sun": {
+            "visible_hours": 708.72,
+            "longest_window_h": 708.72,
+            "longest_gap_h": 0.0
+          }
+        },
+        "3": {
+          "period_start_utc": "2027-01-29T01:26:24Z",
+          "period_end_utc": "2027-02-27T14:09:36Z",
+          "both": {
+            "visible_hours": 113.85,
+            "longest_window_h": 113.85,
+            "longest_gap_h": 372.99
+          },
+          "best_overlap": {
+            "hours": 113.9,
+            "start_utc": "2027-02-07T07:19:04Z",
+            "end_utc": "2027-02-12T01:10:10Z"
+          },
+          "earth": {
+            "visible_hours": 301.19,
+            "longest_window_h": 301.19,
+            "longest_gap_h": 221.88
+          },
+          "sun": {
+            "visible_hours": 335.73,
+            "longest_window_h": 335.73,
+            "longest_gap_h": 372.99
+          }
+        },
+        "4": {
+          "period_start_utc": "2027-02-27T14:09:36Z",
+          "period_end_utc": "2027-03-29T02:52:48Z",
+          "both": {
+            "visible_hours": 0.0,
+            "longest_window_h": 0.0,
+            "longest_gap_h": 708.72
+          },
+          "best_overlap": {
+            "hours": 0.0,
+            "start_utc": null,
+            "end_utc": null
+          },
+          "earth": {
+            "visible_hours": 302.67,
+            "longest_window_h": 302.67,
+            "longest_gap_h": 238.58
+          },
+          "sun": {
+            "visible_hours": 0.0,
+            "longest_window_h": 0.0,
+            "longest_gap_h": 708.72
+          }
+        }
+      },
+      "cost": {
+        "horizon_lookup": "not_applicable",
+        "landing_time_utc": "2026-12-01T00:00:00Z",
+        "mission_days": 88.7,
+        "trials": 10000,
+        "p_survive_full_mission": 0.015,
+        "p_zero_usable_hours": 0.0,
+        "burn_M_per_usable_h": {
+          "p10": 0.168,
+          "p50": 0.236,
+          "p90": 0.376
+        },
+        "usable_h": {
+          "p10": 444.0,
+          "p50": 698.0,
+          "p90": 832.0
+        },
+        "alive_days": {
+          "p10": 48.8,
+          "p50": 73.5,
+          "p90": 77.8
+        },
+        "histogram": {
+          "bin_edges": [
+            0.1074,
+            1.4919,
+            2.8763,
+            4.2607,
+            5.6451,
+            7.0296,
+            8.414,
+            9.7984,
+            11.1829,
+            12.5673,
+            13.9517,
+            15.3361,
+            16.7206,
+            18.105,
+            19.4894,
+            20.8739,
+            22.2583,
+            23.6427,
+            25.0272,
+            26.4116,
+            27.796,
+            29.1804,
+            30.5649,
+            31.9493,
+            33.3337,
+            34.7182,
+            36.1026,
+            37.487,
+            38.8714,
+            40.2559,
+            41.6403,
+            43.0247,
+            44.4092,
+            45.7936,
+            47.178,
+            48.5624,
+            49.9469,
+            51.3313,
+            52.7157,
+            54.1002,
+            55.4846
+          ],
+          "counts": [
+            9995,
+            3,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ]
+        }
+      }
+    }
+  }
+}
