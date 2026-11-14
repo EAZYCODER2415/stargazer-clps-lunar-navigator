@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, RotateCcw, Settings } from 'lucide-react';
+import { ChevronDown, CircleQuestionMark, RotateCcw } from 'lucide-react';
 import { calculateEarthPosition, calculateSunPosition, clearanceOf } from '../utils/ephemerisRuntime';
 import landingSites from '../data/landingSites.json';
 
@@ -9,7 +9,7 @@ const Header = ({
   onSiteChange,
   viewMode,
   onViewModeChange,
-  onSettingsClick,
+  onHelpClick,
   verdict,
   sunVisibleHours,
   earthVisibleHours
@@ -110,15 +110,6 @@ const Header = ({
       <div className="mission-header-actions">
         <button
           type="button"
-          className="mission-header-pov"
-          onClick={() => onViewModeChange(viewMode === 'surface' ? 'free' : 'surface')}
-          aria-label={`Switch to ${viewMode === 'surface' ? 'free' : 'surface'} view`}
-        >
-          <span>{viewMode === 'surface' ? '1st POV' : 'FREE VIEW'}</span>
-          <small>{viewMode === 'surface' ? 'Surface Cam' : 'Camera'}</small>
-        </button>
-        <button
-          type="button"
           className="mission-header-icon-button"
           onClick={() => onViewModeChange('surface')}
           aria-label="Reset to surface view"
@@ -129,11 +120,11 @@ const Header = ({
         <button
           type="button"
           className="mission-header-icon-button"
-          onClick={onSettingsClick}
-          aria-label="Open canvas settings"
-          title="Canvas settings"
+          onClick={onHelpClick}
+          aria-label="Help and glossary"
+          title="Help and glossary"
         >
-          <Settings aria-hidden="true" />
+          <CircleQuestionMark aria-hidden="true" />
         </button>
       </div>
     </header>

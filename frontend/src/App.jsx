@@ -15,6 +15,7 @@ import {
 } from './utils/ephemerisRuntime';
 import './styles/horizonTracker.css';
 import ComparisonPanel from './components/ComparisonPanel';
+import HelpCard from './components/HelpCard';
 import landingSites from './data/landingSites.json';
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
   const [showInterface, setShowInterface] = useState(true);
   const [cameraSensitivity, setCameraSensitivity] = useState(1.8);
   const [cameraInfo, setCameraInfo] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
   const handleLookDrag = useCallback((yawDegrees, pitchDegrees) => {
     setCameraPan((current) => ({
       yaw: current.yaw + yawDegrees,
@@ -197,11 +199,12 @@ function App() {
               onSiteChange={setSelectedSite}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
-              onSettingsClick={() => setActiveTool('canvas-settings')}
+              onHelpClick={() => setShowHelp((visible) => !visible)}
               verdict={verdict}
               sunVisibleHours={sunSummary.visibleHours}
               earthVisibleHours={earthSummary.visibleHours}
             />
+            {showHelp && <HelpCard onClose={() => setShowHelp(false)} />}
           </>
         )}
         <CameraControls

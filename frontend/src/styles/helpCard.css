@@ -1,0 +1,92 @@
+/* Help card (opened from the ? button in the header) */
+.sky-compass-title button,
+.help-card-header button {
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.help-card {
+  position: absolute;
+  top: 11.2rem;
+  left: 50%;
+  z-index: 70;
+  width: min(30rem, calc(100% - 1.5rem));
+  transform: translateX(-50%);
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  border-radius: 0.6rem;
+  background: rgba(10, 16, 30, 0.97);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.help-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.help-card h2 {
+  margin: 0;
+  color: #fbbf24;
+  font-size: 0.95rem;
+}
+
+.help-card ol {
+  margin: 0.5rem 0 0.6rem;
+  padding-left: 1.15rem;
+}
+
+.help-card li { margin-bottom: 0.3rem; }
+
+.help-card b { color: #f8fafc; }
+
+.help-card dl {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(71, 85, 105, 0.6);
+  font-size: 0.72rem;
+}
+
+.help-card dl > div {
+  display: grid;
+  grid-template-columns: 5.2rem 1fr;
+  gap: 0.5rem;
+}
+
+.help-card dt { color: #e2e8f0; font-weight: 700; }
+
+.help-card dd { margin: 0; }
+
+.help-card-done {
+  margin-top: 0.7rem;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid rgba(251, 191, 36, 0.6);
+  border-radius: 0.35rem;
+  background: rgba(180, 83, 9, 0.35);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.view-mode-switch button:focus-visible,
+.comparison-card:focus-visible,
+.help-card button:focus-visible,
+.sky-compass button:focus-visible,
+.timeline-jump-actions button:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .help-card { top: 6.3rem; max-height: 60vh; overflow-y: auto; }
+}
