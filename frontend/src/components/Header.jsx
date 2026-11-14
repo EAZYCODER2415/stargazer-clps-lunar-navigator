@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, RotateCcw, Settings } from 'lucide-react';
-import { calculateEarthPosition, calculateSunPosition } from '../utils/ephemeris';
-
-const landingSites = [
-  { name: 'Shackleton Crater', latitude: -89.9, longitude: 0 },
-  { name: 'Malapert Mountain / Massif', latitude: -85.99, longitude: 2.93 },
-  { name: 'Wiechert Circle', latitude: -87.5, longitude: 0 }
-];
+import { calculateEarthPosition, calculateSunPosition } from '../utils/ephemerisRuntime';
+import landingSites from '../data/landingSites.json';
 
 const Header = ({
   time,
@@ -30,7 +25,7 @@ const Header = ({
     <header className="mission-header">
       <div className="mission-header-brand">
         <div>
-          <h1>Lunar Mission</h1>
+          <h1>Stargazer</h1>
           <span className="mission-header-subtitle">NASA CLPS · ARTEMIS</span>
         </div>
         <span className="mission-header-badge">CLASS SIM</span>

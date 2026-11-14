@@ -12,22 +12,19 @@ import {
   getVisibilitySummary,
   createEphemerisTable,
   isAboveHorizon
-} from './utils/ephemeris';
+} from './utils/ephemerisRuntime';
 import './styles/horizonTracker.css';
 import ComparisonPanel from './components/ComparisonPanel';
+import landingSites from './data/landingSites.json';
 
 function App() {
-  const initialTime = new Date('2026-10-18T14:19:59Z');
+  const initialTime = new Date('2026-12-01T00:00:00Z');
   const [time, setTime] = useState(initialTime);
   const [windowStart] = useState(initialTime);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeWarp, setTimeWarp] = useState(1); // 1x speed
   const [activeTool, setActiveTool] = useState('view-modes');
-  const [selectedSite, setSelectedSite] = useState({
-    name: 'Malapert Mountain / Massif',
-    latitude: -85.99,
-    longitude: 2.93
-  });
+  const [selectedSite, setSelectedSite] = useState(landingSites[0]);
   const [viewMode, setViewMode] = useState('surface'); // 'surface' or 'free'
   const [cameraPan, setCameraPan] = useState({ yaw: 0, pitch: 0 });
   const [showSolarFlux, setShowSolarFlux] = useState(true);

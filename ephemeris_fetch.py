@@ -3,7 +3,7 @@ Pull hourly Sun + Earth azimuth/elevation for each landing site from JPL Horizon
 Output: one JSON per site in ./ephemeris_long/  (this is the "already-calculated" ephemeris Liam means)
 Default: 118.2 days of hourly rows (4 lunar days). The first 709 rows are one lunar day (29.53 days).
 
-Run:  pip install requests  &&  python ephemeris_fetch.py
+Run: pip install requests && python ephemeris_fetch.py
 No API key needed.
 
 Optional: python ephemeris_fetch.py <days> <output_folder>
@@ -11,6 +11,7 @@ Optional: python ephemeris_fetch.py <days> <output_folder>
 """
 import json, os, sys, requests
 from datetime import datetime, timedelta
+from pathlib import Path
 
 API = "https://ssd.jpl.nasa.gov/api/horizons.api"
 START = "2026-12-01 00:00"       # change to the scenario start date
@@ -35,9 +36,44 @@ SITES = [
 ]
 
 BODIES = {"sun": "10", "earth": "399"}
+FRONTEND_SITE_MANIFEST = (
+    Path(__file__).resolve().parent / "frontend" / "src" / "data" / "landingSites.json"
+)
+FRONTEND_EPHEMERIS_DIR = (
+    Path(__file__).resolve().parent / "frontend" / "src" / "data" / "ephemeris"
+)
+
+
+def calculate_sun_position(time, latitude, longitude):
+    """Return the demo Sun azimuth/elevation for a lunar surface observer."""
+    del latitude, longitude
+    hours = time.hour + time.minute / 60 + time.second / 3600
+    start_of_year = datetime(time.year, 1, 1)
+    day_of_year = (time - start_of_year).days + 1
+    azimuth = (hours / 24) * 360
+    annual_offset = 1.5 * math.sin((day_of_year - 80) * 2 * math.pi / 365)
+    daily_variation = math.sin(hours * 2 * math.pi / 24)
+    return {"azimuth": azimuth, "elevation": annual_offset + daily_variation}
+
+
+def calculate_earth_position(time, latitude, longitude):
+    """Return the demo Earth azimuth/elevation for a lunar surface observer."""
+    del longitude
+    days = (time - datetime(1970, 1, 1)).total_seconds() / 86400
+    month = 27.321661
+    azimuth = (days * 360 / month) % 360
+    base_elevation = 90 + latitude
+    libration = (
+        2 * math.sin(days * 2 * math.pi / month)
+        + math.sin(days * 2 * math.pi / 29.530588)
+    )
+    elevation = max(-90, min(90, base_elevation + libration))
+    return {"azimuth": azimuth, "elevation": elevation}
 
 
 def fetch(body_id, site):
+    import requests
+
     stop = datetime.strptime(START, "%Y-%m-%d %H:%M") + timedelta(days=DAYS)
     params = {
         "format": "text",
@@ -65,6 +101,23 @@ def fetch(body_id, site):
     return out
 
 
+def write_frontend_site_manifest():
+    """Keep the frontend landing-site metadata derived from ``SITES``."""
+    manifest = [
+        {
+            "id": site["id"],
+            "name": site["name"],
+            "latitude": site["lat"],
+            "longitude": site["lon"],
+        }
+        for site in SITES
+    ]
+    FRONTEND_SITE_MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+    with FRONTEND_SITE_MANIFEST.open("w", encoding="utf-8") as output:
+        json.dump(manifest, output, indent=2)
+        output.write("\n")
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     for site in SITES:
@@ -74,6 +127,8 @@ def main():
         path = f"{OUT_DIR}/{site['id']}.json"
         with open(path, "w") as f:
             json.dump(data, f)
+        with (FRONTEND_EPHEMERIS_DIR / f"{site['id']}.json").open("w", encoding="utf-8") as output:
+            json.dump(data, output)
         print(f"{path}: {len(data['sun'])} hourly rows")
 
 
