@@ -7,6 +7,7 @@ const CameraControls = ({
   viewMode,
   onViewModeChange,
   onPan,
+  onFreeMoveKeys,
   onResetPan,
   invertLook,
   onInvertLookChange,
@@ -27,23 +28,45 @@ const CameraControls = ({
     const wasd = { w: 'up', s: 'down', a: 'left', d: 'right' };
     const opposite = { up: 'down', down: 'up', left: 'right', right: 'left' };
     let frameId;
+    // Free View: the keys fly the camera. Instead of panning, tell the app which keys are held
+    // (and whether Shift is down); the 3D scene turns that into smooth movement.
+    const isFreeView = viewMode === 'free';
+    let shiftHeld = false;
+    const reportFreeMove = () => onFreeMoveKeys?.(
+      { up: pressed.has('up'), down: pressed.has('down'), left: pressed.has('left'), right: pressed.has('right') },
+      shiftHeld
+    );
+    const releaseAll = () => {
+      if (!isFreeView) return;
+      pressed.clear(); shiftHeld = false;
+      reportFreeMove();
+    };
     const handleKeyDown = (event) => {
+      if (isFreeView && event.key === 'Shift') { shiftHeld = true; reportFreeMove(); return; }
       const direction = directionByKey[event.key] || wasd[event.key.toLowerCase()];
       if (!direction) return;
       event.preventDefault();
+      if (isFreeView) {
+        pressed.delete(opposite[direction]);
+        pressed.add(direction);
+        reportFreeMove();
+        return;
+      }
       pressed.delete(opposite[direction]);
       velocity[opposite[direction]] = 0;
       velocity[direction] = 0;
       pressed.add(direction);
     };
     const handleKeyUp = (event) => {
+      if (isFreeView && event.key === 'Shift') { shiftHeld = false; reportFreeMove(); return; }
       const direction = directionByKey[event.key] || wasd[event.key.toLowerCase()];
       if (direction) pressed.delete(direction);
+      if (isFreeView && direction) reportFreeMove();
     };
     const animatePan = (now) => {
       const deltaSeconds = Math.min((now - lastFrame.value) / 1000, 0.05);
       lastFrame.value = now;
-      ['up', 'down', 'left', 'right'].forEach((direction) => {
+      if (!isFreeView) ['up', 'down', 'left', 'right'].forEach((direction) => {
         const target = pressed.has(direction) ? CONSTANT_PAN_SPEED_AFTER_ONE_SECOND * sensitivity : 0;
         const rate = (pressed.has(direction) ? 20 : 24) * sensitivity;
         velocity[direction] += (target - velocity[direction]) * Math.min(1, rate * deltaSeconds);
@@ -58,13 +81,16 @@ const CameraControls = ({
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', releaseAll);       // a key held while the window loses focus must not keep flying
     frameId = requestAnimationFrame(animatePan);
     return () => {
       cancelAnimationFrame(frameId);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', releaseAll);
+      releaseAll();
     };
-  }, [onPan, sensitivity]);
+  }, [onPan, sensitivity, viewMode, onFreeMoveKeys]);
 
   return (
     <div className={`camera-controls${isHidden ? ' is-hidden' : ''}`}>
@@ -101,7 +127,7 @@ const CameraControls = ({
         </div>
         <span className="camera-pan-hint">
           {viewMode === 'free'
-            ? 'Arrows / WASD walk · drag to look · stays within 2 km'
+            ? 'Click or press a move key · mouse looks · Shift faster · Esc frees the mouse'
             : `Arrows / WASD · direction ${invertLook ? 'inverted' : 'normal'}`}
         </span>
         <div className="camera-look-actions">

@@ -35,11 +35,19 @@ const FAR_LAYER = 2;               // terrain beyond ~5 km is drawn in a separat
 const FAR_RING_START = 4;
 const GRAIN_TILE_M = 13.3;         // one repeat of the dust texture
 const SUN_STRENGTH = 4.2;          // how bright full sunlight is on the ground, rocks and lander
-// Free View: walk over the real ground at head height, never more than this far from the lander.
+// Free View: fly over the real ground like a first-person game, never more than this far from the lander.
 const FREE_VIEW_RANGE = 2000;
-const FREE_VIEW_EYE_HEIGHT = 2;
-const FREE_VIEW_KEEP_OUT = 3.5;    // do not walk through the lander
+const FREE_VIEW_EYE_HEIGHT = 2;    // the eye never gets closer to the ground than this
+const FREE_VIEW_CEILING = 500;     // ... and never further above it than this
+const FREE_VIEW_KEEP_OUT = 3.5;    // do not fly through the lander
 const FREE_VIEW_START_DISTANCE = 16;
+const FREE_VIEW_BASE_SPEED = 25;   // metres per second beside the lander
+const FREE_VIEW_SPEED_PER_METRE = 0.156;   // faster further out, so the 2 km range does not take minutes to cross
+const FREE_VIEW_MAX_SPEED = 100;      // before the Shift boost
+const FREE_VIEW_BOOST = 4;         // Shift
+const FREE_VIEW_PAD_STEP = 3;      // metres per click of the on-screen pad
+const DEFAULT_LOOK_SENSITIVITY = 1.8;
+const MOVE_KEYS = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd']);
 
 // Real angular radii: Sun 0.27°, Earth 0.95° as seen from the Moon. Drawn larger so they read on screen.
 const SUN_EXAGGERATION = 3;
@@ -695,20 +703,22 @@ const LunarScene3D = ({
   onCameraInfo,
   cameraInfo,
   showInterface,
-  freeMoveRef
+  freeMoveRef,
+  lookSensitivity = DEFAULT_LOOK_SENSITIVITY
 }) => {
   const [fps, setFps] = useState(0);
   const [hover, setHover] = useState(null);
+  const [isPointerLocked, setIsPointerLocked] = useState(false);   // Free View has taken the mouse
   const [isCompassVisible, setIsCompassVisible] = useState(true);
   const [siteVersion, setSiteVersion] = useState(0);     // bumped when a site's terrain has finished loading
   const containerRef = useRef(null);
   const stageRef = useRef(null);       // everything created once
   const siteRef = useRef(null);        // everything rebuilt per site
-  const propsRef = useRef({ cameraYaw, cameraPitch, viewMode, invertLook, onLookDrag, onCameraInfo, freeMoveRef });
+  const propsRef = useRef({ cameraYaw, cameraPitch, viewMode, invertLook, onLookDrag, onCameraInfo, freeMoveRef, lookSensitivity });
 
   // Latest props for the render loop and pointer handlers, which are set up only once.
   useEffect(() => {
-    propsRef.current = { cameraYaw, cameraPitch, viewMode, invertLook, onLookDrag, onCameraInfo, freeMoveRef };
+    propsRef.current = { cameraYaw, cameraPitch, viewMode, invertLook, onLookDrag, onCameraInfo, freeMoveRef, lookSensitivity };
   });
 
   // ---- One-time setup: renderer, sky, lander, input ----
@@ -813,12 +823,45 @@ const LunarScene3D = ({
     const pointer = new THREE.Vector2();
     let lastHoverCheck = 0;
 
+    // Free View only: lock the pointer to the canvas, as a first-person game does. The browser
+    // releases it on Esc; we release it when Free View is left.
+    let pointerLocked = false;
+    const lockPointer = () => {
+      if (propsRef.current.viewMode !== 'free' || pointerLocked || !canvas.requestPointerLock) return;
+      try {
+        // Browsers refuse a new lock for about a second after Esc; the next click or key press retries.
+        canvas.requestPointerLock()?.catch?.(() => {});
+      } catch { /* not available here: dragging still looks around */ }
+    };
+    const onPointerLockChange = () => {
+      pointerLocked = document.pointerLockElement === canvas;
+      setIsPointerLocked(pointerLocked);
+      drag.active = false;
+      canvas.style.cursor = pointerLocked ? 'none' : 'grab';
+      if (pointerLocked) setHover(null);
+    };
+    const onMoveKeyDown = (event) => {
+      if (!event.repeat && MOVE_KEYS.has(event.key.toLowerCase())) lockPointer();
+    };
+    document.addEventListener('pointerlockchange', onPointerLockChange);
+    window.addEventListener('keydown', onMoveKeyDown);
+
     const onPointerDown = (event) => {
+      if (pointerLocked) return;
       drag.active = true; drag.x = event.clientX; drag.y = event.clientY;
-      canvas.setPointerCapture?.(event.pointerId);
+      if (propsRef.current.viewMode === 'free') lockPointer();      // a pointer about to be locked cannot also be captured
+      else canvas.setPointerCapture?.(event.pointerId);
       canvas.style.cursor = 'grabbing';
     };
     const onPointerMove = (event) => {
+      if (pointerLocked) {
+        // Mouse look: moving the mouse right turns right, moving it up looks up.
+        const { invertLook: inverted, lookSensitivity: sensitivity } = propsRef.current;
+        const degreesPerPixel = (camera.fov / container.clientHeight) * (sensitivity / DEFAULT_LOOK_SENSITIVITY) * (inverted ? -1 : 1);
+        const limit = (value) => Math.max(-150, Math.min(150, value));      // browsers can report one huge jump as the lock starts
+        propsRef.current.onLookDrag?.(-limit(event.movementX) * degreesPerPixel, -limit(event.movementY) * degreesPerPixel);
+        return;
+      }
       if (drag.active) {
         const degreesPerPixel = camera.fov / container.clientHeight;
         const direction = propsRef.current.invertLook ? -1 : 1;
@@ -846,8 +889,8 @@ const LunarScene3D = ({
     };
     const endDrag = (event) => {
       drag.active = false;
-      canvas.releasePointerCapture?.(event.pointerId);
-      canvas.style.cursor = 'grab';
+      if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      canvas.style.cursor = pointerLocked ? 'none' : 'grab';
     };
     const onWheel = (event) => {
       event.preventDefault();
@@ -873,6 +916,8 @@ const LunarScene3D = ({
     let fpsWindowStart = performance.now();
     let lastInfo = { centerAz: -1, fov: -1, at: 0 };
     const forward = new THREE.Vector3();
+    const flight = new THREE.Vector3();          // Free View velocity, metres per second
+    const flightTarget = new THREE.Vector3();
     let lastFrameAt = performance.now();
     let frame;
     const render = () => {
@@ -901,30 +946,53 @@ const LunarScene3D = ({
           propsRef.current.onLookDrag?.(Math.atan2(x, z) / DEG - yaw, -3 - pitch);
         } else {
           camera.position.set(0, EYE_Y, 0);
+          if (document.pointerLockElement === canvas) document.exitPointerLock();
         }
-        if (moves) { moves.forward = 0; moves.right = 0; }
+        if (moves) { moves.stepForward = 0; moves.stepRight = 0; }
+        flight.set(0, 0, 0);
         canvas.style.cursor = 'grab';
         sensorHead.visible = mode === 'free';   // don't put the sensor inside the POV camera
       }
       if (mode === 'free') {
-        // Walking: arrow keys / WASD arrive as steps (see App.jsx). A step is longer far from the
-        // lander, so the 2 km range can be crossed without holding a key for minutes.
+        // Flying: W / Up moves along the look direction (up and down included), A / D strafes.
+        // App.jsx reports which keys are held; the speed is applied here, once per frame, so it is smooth.
         const position = camera.position;
-        if (moves && (moves.forward || moves.right)) {
-          const stride = 0.8 + 0.005 * Math.hypot(position.x, position.z);
-          const heading = yaw * DEG;
-          position.x += (-Math.sin(heading) * moves.forward + Math.cos(heading) * moves.right) * stride;
-          position.z += (-Math.cos(heading) * moves.forward - Math.sin(heading) * moves.right) * stride;
-          moves.forward = 0; moves.right = 0;
-          const distance = Math.hypot(position.x, position.z);
-          const allowed = Math.min(FREE_VIEW_RANGE, Math.max(FREE_VIEW_KEEP_OUT, distance));
-          if (distance > 0 && allowed !== distance) { position.x *= allowed / distance; position.z *= allowed / distance; }
-          if (distance === 0) position.x = FREE_VIEW_KEEP_OUT;
+        const heading = yaw * DEG; const tilt = pitch * DEG;
+        const aheadX = -Math.sin(heading) * Math.cos(tilt); const aheadY = Math.sin(tilt); const aheadZ = -Math.cos(heading) * Math.cos(tilt);
+        const sideX = Math.cos(heading); const sideZ = -Math.sin(heading);
+        const held = moves || { forward: 0, right: 0, boost: false, stepForward: 0, stepRight: 0 };
+        const speed = Math.min(FREE_VIEW_MAX_SPEED, FREE_VIEW_BASE_SPEED + FREE_VIEW_SPEED_PER_METRE * Math.hypot(position.x, position.z))
+          * (held.boost ? FREE_VIEW_BOOST : 1);
+        flightTarget.set(
+          (aheadX * held.forward + sideX * held.right) * speed,
+          aheadY * held.forward * speed,
+          (aheadZ * held.forward + sideZ * held.right) * speed
+        );
+        flight.lerp(flightTarget, Math.min(1, deltaSeconds * 10));       // ease in and out instead of snapping
+        if (flight.lengthSq() < 0.0001) flight.set(0, 0, 0);
+        position.addScaledVector(flight, deltaSeconds);
+        if (held.stepForward || held.stepRight) {
+          // Clicks on the on-screen pad: one short hop each.
+          position.x += (aheadX * held.stepForward + sideX * held.stepRight) * FREE_VIEW_PAD_STEP;
+          position.y += aheadY * held.stepForward * FREE_VIEW_PAD_STEP;
+          position.z += (aheadZ * held.stepForward + sideZ * held.stepRight) * FREE_VIEW_PAD_STEP;
+          held.stepForward = 0; held.stepRight = 0;
         }
-        // The eye stays a fixed height above the real ground, eased so that steps over coarse terrain are not jerky.
-        const eyeHeight = groundAt(position.x, position.z) + FREE_VIEW_EYE_HEIGHT;
-        position.y += (eyeHeight - position.y) * Math.min(1, deltaSeconds * 12);
-        position.y = Math.max(position.y, eyeHeight - 0.8);     // never dip to the surface on a steep slope
+        // Limits: stay out of the lander, within range of it, above the ground and below the ceiling.
+        const fromLanderY = position.y - 1.5;
+        const fromLander = Math.hypot(position.x, fromLanderY, position.z);
+        if (fromLander < FREE_VIEW_KEEP_OUT) {
+          if (fromLander < 0.001) position.x = FREE_VIEW_KEEP_OUT;
+          else {
+            const push = FREE_VIEW_KEEP_OUT / fromLander;
+            position.set(position.x * push, 1.5 + fromLanderY * push, position.z * push);
+          }
+        }
+        const distance = Math.hypot(position.x, position.z);
+        if (distance > FREE_VIEW_RANGE) { position.x *= FREE_VIEW_RANGE / distance; position.z *= FREE_VIEW_RANGE / distance; }
+        const ground = groundAt(position.x, position.z);
+        if (position.y < ground + FREE_VIEW_EYE_HEIGHT) { position.y = ground + FREE_VIEW_EYE_HEIGHT; flight.y = Math.max(0, flight.y); }
+        if (position.y > ground + FREE_VIEW_CEILING) { position.y = ground + FREE_VIEW_CEILING; flight.y = Math.min(0, flight.y); }
       }
       camera.rotation.set(pitch * DEG, yaw * DEG, 0, 'YXZ');
 
@@ -972,6 +1040,9 @@ const LunarScene3D = ({
       canvas.removeEventListener('pointercancel', endDrag);
       canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('wheel', onWheel);
+      document.removeEventListener('pointerlockchange', onPointerLockChange);
+      window.removeEventListener('keydown', onMoveKeyDown);
+      if (document.pointerLockElement === canvas) document.exitPointerLock();
       disposeObject(scene);
       disposeObject(skyScene);
       renderer.dispose();
@@ -1194,6 +1265,7 @@ const LunarScene3D = ({
           )}
         </>
       )}
+      {isPointerLocked && viewMode === 'free' && <div className="scene-crosshair" aria-hidden="true">+</div>}
       {hoverText && (
         <div className="scene-hover-tip" role="tooltip" style={{ left: `${hover.x + 14}px`, top: `${hover.y + 14}px` }}>
           <strong>{hoverText[0]}</strong>
