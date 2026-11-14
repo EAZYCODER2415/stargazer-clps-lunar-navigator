@@ -24,6 +24,7 @@ function parseEphemerisTime(value) {
 
 const sites = [malapert, monsMouton, shackleton].map((data) => ({
   ...data,
+  horizon: HORIZONS[data.site.id] || null,
   sun: data.sun.map(normalizeSample),
   earth: data.earth.map(normalizeSample)
 }));
@@ -45,15 +46,23 @@ function findSite(latitude, longitude) {
 
 function interpolate(samples, time) {
   const timestamp = time.getTime();
-  if (timestamp <= samples[0].time.getTime()) return samples[0];
-  if (timestamp >= samples[samples.length - 1].time.getTime()) return samples[samples.length - 1];
+  const first = samples[0].time.getTime();
+  const last = samples[samples.length - 1].time.getTime();
+  if (timestamp <= first) return samples[0];
+  if (timestamp >= last) return samples[samples.length - 1];
 
-  const upperIndex = samples.findIndex((sample) => sample.time.getTime() >= timestamp);
-  const lower = samples[upperIndex - 1];
-  const upper = samples[upperIndex];
+  // Samples are evenly spaced (hourly), so jump straight to the right pair.
+  const stepMs = (last - first) / (samples.length - 1);
+  const lowerIndex = Math.min(samples.length - 2, Math.floor((timestamp - first) / stepMs));
+  const lower = samples[lowerIndex];
+  const upper = samples[lowerIndex + 1];
   const ratio = (timestamp - lower.time.getTime()) / (upper.time.getTime() - lower.time.getTime());
+  // Azimuth wraps at 360°, so interpolate along the short way round.
+  let azimuthDelta = upper.azimuth - lower.azimuth;
+  if (azimuthDelta > 180) azimuthDelta -= 360;
+  if (azimuthDelta < -180) azimuthDelta += 360;
   return {
-    azimuth: lower.azimuth + (upper.azimuth - lower.azimuth) * ratio,
+    azimuth: (lower.azimuth + azimuthDelta * ratio + 360) % 360,
     elevation: lower.elevation + (upper.elevation - lower.elevation) * ratio
   };
 }
@@ -131,9 +140,85 @@ export const findNextHorizonTransition = (time, positionCalculator, latitude, lo
         hours: (candidateTime.getTime() - time.getTime()) / 3600000
       };
     }
+    previousVisible = visible;
   }
   return null;
 };
+
+/**
+ * One pass over a site's hourly data for the lunar day starting at startTime.
+ * Everything the UI shows about "how many hours" comes from here, so the
+ * timeline, the banner and the comparison panel can never disagree.
+ */
+export const getSiteWindows = (startTime, latitude, longitude, terrain = true) => {
+  const hours = Math.floor(LUNAR_DAY_HOURS);
+  let sunHours = 0; let earthHours = 0; let bothHours = 0;
+  let darkRun = 0; let longestDarkHours = 0;
+  let noEarthRun = 0; let longestNoEarthHours = 0;
+  let bothRun = 0; let bestBoth = { hours: 0, start: null };
+
+  for (let hour = 0; hour < hours; hour += 1) {
+    const sampleTime = new Date(startTime.getTime() + hour * 3600000);
+    const sunUp = clearanceOf(calculateSunPosition(sampleTime, latitude, longitude), latitude, longitude, terrain) > 0;
+    const earthUp = clearanceOf(calculateEarthPosition(sampleTime, latitude, longitude), latitude, longitude, terrain) > 0;
+    if (sunUp) { sunHours += 1; darkRun = 0; } else { darkRun += 1; longestDarkHours = Math.max(longestDarkHours, darkRun); }
+    if (earthUp) { earthHours += 1; noEarthRun = 0; } else { noEarthRun += 1; longestNoEarthHours = Math.max(longestNoEarthHours, noEarthRun); }
+    if (sunUp && earthUp) {
+      bothHours += 1;
+      bothRun += 1;
+      if (bothRun > bestBoth.hours) {
+        bestBoth = { hours: bothRun, start: new Date(sampleTime.getTime() - (bothRun - 1) * 3600000) };
+      }
+    } else {
+      bothRun = 0;
+    }
+  }
+
+  return {
+    totalHours: hours,
+    sunHours, earthHours, bothHours,
+    longestDarkHours, longestNoEarthHours,
+    longestBothHours: bestBoth.hours,
+    longestBothStart: bestBoth.start
+  };
+};
+
+/**
+ * Every horizon crossing of one body in the lunar day starting at startTime.
+ * Found once per site (hourly scan, then narrowed to the minute), so the UI can
+ * look up "what happens next" instantly while the timeline plays.
+ */
+export const getHorizonEvents = (startTime, positionCalculator, latitude, longitude, terrain = true) => {
+  const events = [];
+  const isUp = (ms) => clearanceOf(positionCalculator(new Date(ms), latitude, longitude), latitude, longitude, terrain) > 0;
+  const startMs = startTime.getTime();
+  const endMs = startMs + LUNAR_DAY_HOURS * 3600000;
+  let previousMs = startMs;
+  let previousUp = isUp(startMs);
+  for (let ms = startMs + 3600000; previousMs < endMs; ms += 3600000) {
+    const currentMs = Math.min(ms, endMs);
+    const currentUp = isUp(currentMs);
+    if (currentUp !== previousUp) {
+      let low = previousMs; let high = currentMs;
+      while (high - low > 60000) {
+        const middle = (low + high) / 2;
+        if (isUp(middle) === previousUp) low = middle; else high = middle;
+      }
+      events.push({ time: new Date(high), kind: currentUp ? 'rise' : 'set' });
+    }
+    previousMs = currentMs;
+    previousUp = currentUp;
+  }
+  return events;
+};
+
+/** Hourly az/el samples for one body over the lunar day (used to draw sky paths). */
+export const getSkyPath = (startTime, positionCalculator, latitude, longitude) => (
+  Array.from({ length: Math.floor(LUNAR_DAY_HOURS) + 1 }, (_, hour) => {
+    const time = new Date(startTime.getTime() + hour * 3600000);
+    return { time, ...positionCalculator(time, latitude, longitude) };
+  })
+);
 
 export const getVisibilitySummary = (startTime, positionCalculator, latitude, longitude) => {
   const durationMs = 29.53 * 24 * 60 * 60 * 1000;
@@ -158,7 +243,7 @@ export const getVisibilitySummary = (startTime, positionCalculator, latitude, lo
   return { visibleHours, longestWindowHours, durationHours: 29.53 * 24 };
 };
 
-export const getVisibilityBands = (startTime, positionCalculator, latitude, longitude) => {
+export const getVisibilityBands = (startTime, positionCalculator, latitude, longitude, terrain = true) => {
   const sampleCount = 240;
   const bands = [];
   let bandStart = null;
