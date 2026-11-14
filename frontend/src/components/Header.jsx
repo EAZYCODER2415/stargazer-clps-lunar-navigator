@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ChevronDown, RotateCcw, Settings } from 'lucide-react';
-import { calculateEarthPosition, calculateSunPosition } from '../utils/ephemerisRuntime';
+import { ChevronDown, CircleQuestionMark, RotateCcw } from 'lucide-react';
+import { calculateEarthPosition, calculateSunPosition, clearanceOf } from '../utils/ephemerisRuntime';
 import landingSites from '../data/landingSites.json';
 
 const Header = ({
@@ -9,7 +9,7 @@ const Header = ({
   onSiteChange,
   viewMode,
   onViewModeChange,
-  onSettingsClick,
+  onHelpClick,
   verdict,
   sunVisibleHours,
   earthVisibleHours
@@ -18,6 +18,9 @@ const Header = ({
   const [isVerdictOpen, setIsVerdictOpen] = useState(false);
   const sun = calculateSunPosition(time, selectedSite.latitude, selectedSite.longitude);
   const earth = calculateEarthPosition(time, selectedSite.latitude, selectedSite.longitude);
+  // Visible = above the real LOLA skyline, not just above 0°
+  const sunUp = clearanceOf(sun, selectedSite.latitude, selectedSite.longitude) > 0;
+  const earthUp = clearanceOf(earth, selectedSite.latitude, selectedSite.longitude) > 0;
   const utcTime = time.toISOString().replace('T', ' ').replace('Z', ' UTC');
 
   const handleSiteChange = (site) => {
@@ -27,13 +30,6 @@ const Header = ({
 
   return (
     <header className="mission-header">
-      <div className="mission-verdict mission-header-verdict" role="status">
-        <strong>{verdict}</strong>
-        <span>
-          {sunVisibleHours.toFixed(0)} h Sun / {earthVisibleHours.toFixed(0)} h Earth visible in this 29.53-day lunar day
-          {' · '}Celestial disc sizes exaggerated for visibility
-        </span>
-      </div>
       <div className="mission-header-brand">
         <div>
           <h1>Stargazer</h1>
@@ -84,7 +80,7 @@ const Header = ({
         aria-haspopup="dialog"
         title="see verdict message"
       >
-        <strong>🌍 Direct radio contact is {sun.elevation >= 0 && earth.elevation >= 0 ? 'possible' : 'impossible'}</strong>
+        <strong>🌍 Direct radio contact is {sunUp && earthUp ? 'possible' : 'impossible'}</strong>
       </button>
       {isVerdictOpen && (
         <div className="mission-verdict-popup" role="dialog" aria-label="Verdict message">
@@ -103,24 +99,15 @@ const Header = ({
         </div>
         <div className="mission-header-reading">
           <span>SOLAR ELEV</span>
-          <strong className="solar">{sun.elevation >= 0 ? '+' : ''}{sun.elevation.toFixed(2)}° ({sun.elevation >= 0 ? 'Illuminated' : 'Night'})</strong>
+          <strong className="solar">{sun.elevation >= 0 ? '+' : ''}{sun.elevation.toFixed(2)}° ({sunUp ? 'Illuminated' : 'Night'})</strong>
         </div>
         <div className="mission-header-reading">
           <span>DTE LINK</span>
-          <strong className="dte">{earth.elevation > 0 ? 'NOMINAL' : 'BELOW HORIZON'} ({earth.elevation >= 0 ? '+' : ''}{earth.elevation.toFixed(1)}° Elev)</strong>
+          <strong className="dte">{earthUp ? 'NOMINAL' : 'BELOW HORIZON'} ({earth.elevation >= 0 ? '+' : ''}{earth.elevation.toFixed(1)}° Elev)</strong>
         </div>
       </div>
 
       <div className="mission-header-actions">
-        <button
-          type="button"
-          className="mission-header-pov"
-          onClick={() => onViewModeChange(viewMode === 'surface' ? 'free' : 'surface')}
-          aria-label={`Switch to ${viewMode === 'surface' ? 'free' : 'surface'} view`}
-        >
-          <span>{viewMode === 'surface' ? '1st POV' : 'FREE VIEW'}</span>
-          <small>{viewMode === 'surface' ? 'Surface Cam' : 'Camera'}</small>
-        </button>
         <button
           type="button"
           className="mission-header-icon-button"
@@ -133,11 +120,11 @@ const Header = ({
         <button
           type="button"
           className="mission-header-icon-button"
-          onClick={onSettingsClick}
-          aria-label="Open canvas settings"
-          title="Canvas settings"
+          onClick={onHelpClick}
+          aria-label="Help and glossary"
+          title="Help and glossary"
         >
-          <Settings aria-hidden="true" />
+          <CircleQuestionMark aria-hidden="true" />
         </button>
       </div>
     </header>

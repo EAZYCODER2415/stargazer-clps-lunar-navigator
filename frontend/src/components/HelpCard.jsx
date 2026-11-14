@@ -1,3 +1,5 @@
+import '../styles/helpCard.css';
+
 const TERMS = [
   ['Elevation', 'How high something is above the horizon, in degrees. 0° is the horizon.'],
   ['Azimuth', 'Compass direction. 0° is north, 90° east, 180° south, 270° west.'],
@@ -13,7 +15,7 @@ const HelpCard = ({ onClose }) => (
       <button type="button" onClick={onClose} aria-label="Close help">×</button>
     </div>
     <ol>
-      <li><b>Pick a landing site</b> in the Target menu at the top.</li>
+      <li><b>Pick a landing site</b> in the Landing site menu at the top.</li>
       <li><b>Press play or drag the timeline</b> to move through the lunar day. Gold bars show when the Sun is up, blue bars when Earth is in view.</li>
       <li><b>Drag the scene to look around</b>, scroll to zoom, or use Look at Sun / Look at Earth. Then open <b>Compare sites</b>.</li>
     </ol>

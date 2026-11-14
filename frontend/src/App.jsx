@@ -10,11 +10,12 @@ import {
   findNextHorizonTransition,
   getVisibilityBands,
   getVisibilitySummary,
-  isAboveHorizon,
+  clearanceOf,
   getBestOverlap
 } from './utils/ephemerisRuntime';
 import './styles/horizonTracker.css';
 import ComparisonPanel from './components/ComparisonPanel';
+import HelpCard from './components/HelpCard';
 import landingSites from './data/landingSites.json';
 
 function App() {
@@ -30,11 +31,19 @@ function App() {
   const [showSolarFlux, setShowSolarFlux] = useState(true);
   const [showDTELink, setShowDTELink] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
-  const [showHorizonMask, setShowHorizonMask] = useState(true);
+  const [showHorizonMask, setShowHorizonMask] = useState(false);   // survey grid over the ground: off until asked for
   const [invertLook, setInvertLook] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [showInterface, setShowInterface] = useState(true);
   const [cameraSensitivity, setCameraSensitivity] = useState(1.8);
+  const [cameraInfo, setCameraInfo] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const handleLookDrag = useCallback((yawDegrees, pitchDegrees) => {
+    setCameraPan((current) => ({
+      yaw: current.yaw + yawDegrees,
+      pitch: Math.max(-60, Math.min(80, current.pitch + pitchDegrees))
+    }));
+  }, []);
 
   // Calculate telemetry values using proper ephemeris
   const calculateTelemetry = () => {
@@ -54,8 +63,8 @@ function App() {
     return {
       solarPower: Math.max(0, solarPower),
       dteSnr: dteSnr,
-      isSunVisible: isAboveHorizon(sunPos.elevation),
-      isEarthVisible: isAboveHorizon(earthPos.elevation)
+      isSunVisible: clearanceOf(sunPos, selectedSite.latitude, selectedSite.longitude) > 0,
+      isEarthVisible: clearanceOf(earthPos, selectedSite.latitude, selectedSite.longitude) > 0
     };
   };
 
@@ -162,6 +171,7 @@ function App() {
     <div className="app">
       <LunarScene3D
         time={time}
+        windowStart={windowStart}
         selectedSite={selectedSite}
         showSolarFlux={showSolarFlux}
         showDTELink={showDTELink}
@@ -169,6 +179,13 @@ function App() {
         showHorizonMask={showHorizonMask}
         cameraYaw={cameraPan.yaw}
         cameraPitch={cameraPan.pitch}
+        useTerrain
+        viewMode={viewMode}
+        viewResetCount={0}
+        invertLook={invertLook}
+        onLookDrag={handleLookDrag}
+        onCameraInfo={setCameraInfo}
+        cameraInfo={cameraInfo}
         showInterface={showInterface}
       />
 
@@ -182,11 +199,12 @@ function App() {
               onSiteChange={setSelectedSite}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
-              onSettingsClick={() => setActiveTool('canvas-settings')}
+              onHelpClick={() => setShowHelp((visible) => !visible)}
               verdict={verdict}
               sunVisibleHours={sunSummary.visibleHours}
               earthVisibleHours={earthSummary.visibleHours}
             />
+            {showHelp && <HelpCard onClose={() => setShowHelp(false)} />}
           </>
         )}
         <CameraControls
