@@ -9,7 +9,7 @@ No API key needed.
 Optional: python ephemeris_fetch.py <days> <output_folder>
   e.g.    python ephemeris_fetch.py 29.53 my_folder   (one lunar day only)
 """
-import json, os, sys, requests
+import json, os, sys, requests, math
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -119,7 +119,9 @@ def write_frontend_site_manifest():
 
 
 def main():
+    write_frontend_site_manifest()
     os.makedirs(OUT_DIR, exist_ok=True)
+    FRONTEND_EPHEMERIS_DIR.mkdir(parents=True, exist_ok=True)
     for site in SITES:
         data = {"site": site, "start": START, "step_h": 1}
         for name, bid in BODIES.items():
