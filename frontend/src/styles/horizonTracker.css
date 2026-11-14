@@ -190,7 +190,7 @@ header {
   color: #e2e8f0;
   transform: none;
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   text-align: left;
   cursor: pointer;
   margin-inline: auto;
@@ -230,7 +230,7 @@ header {
   color: #e2e8f0;
   transform: translateX(-50%);
   backdrop-filter: blur(10px);
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   text-align: center;
 }
 
@@ -241,7 +241,7 @@ header {
 
 .mission-verdict-popup span {
   color: #94a3b8;
-  font-size: 0.68rem;
+  font-size: 0.76rem;
 }
 
 .mission-header-site {
@@ -368,7 +368,7 @@ header {
 .mission-header-reading strong {
   overflow: hidden;
   color: #fbbf24;
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   font-weight: 500;
   text-overflow: ellipsis;
 }
@@ -382,6 +382,41 @@ header {
   flex: 0 0 auto;
   align-items: center;
   gap: 0.3rem;
+}
+
+/* Laptop widths: the verdict and the UTC / Sun / DTE readouts stay large (14 px), and the
+   header makes room for them by tightening its spacing. */
+@media (max-width: 1500px) {
+  .mission-header {
+    gap: 0.4rem;
+    padding-inline: 0.55rem;
+  }
+
+  .mission-header-brand {
+    gap: 0.35rem;
+  }
+
+  .mission-header-verdict {
+    min-width: 0;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.78rem;
+  }
+
+  .mission-header-telemetry {
+    gap: 0.4rem;
+  }
+
+  .mission-header-reading {
+    padding-left: 0.4rem;
+  }
+
+  .mission-header-reading strong {
+    font-size: 0.78rem;
+  }
+
+  .mission-header-site {
+    min-width: 7rem;
+  }
 }
 
 .mission-header-pov,
