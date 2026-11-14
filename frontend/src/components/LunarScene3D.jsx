@@ -379,52 +379,47 @@ const createEarthTextures = () => {
   return { surface: toTexture(surface), clouds: toTexture(clouds) };
 };
 
-/** Earth with a real day/night terminator: it is lit from the Sun's direction even when the Sun is below our horizon. */
-const createEarth = () => {
-  const textures = createEarthTextures();
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uSurface: { value: textures.surface },
-      uClouds: { value: textures.clouds },
-      uSunDirection: { value: new THREE.Vector3(1, 0, 0) },
-      uCloudShift: { value: 0 }
-    },
-    vertexShader: `
-      varying vec2 vUv;
-      varying vec3 vWorldNormal;
-      varying vec3 vWorldPosition;
-      void main() {
-        vUv = uv;
-        vWorldNormal = normalize(mat3(modelMatrix) * normal);
-        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-        vWorldPosition = worldPosition.xyz;
-        gl_Position = projectionMatrix * viewMatrix * worldPosition;
-      }
-    `,
-    fragmentShader: `
-      uniform sampler2D uSurface;
-      uniform sampler2D uClouds;
-      uniform vec3 uSunDirection;
-      uniform float uCloudShift;
-      varying vec2 vUv;
-      varying vec3 vWorldNormal;
-      varying vec3 vWorldPosition;
-      void main() {
-        vec3 normal = normalize(vWorldNormal);
-        float light = dot(normal, normalize(uSunDirection));
-        float day = smoothstep(-0.08, 0.22, light);
-        vec3 surface = texture2D(uSurface, vUv).rgb;
-        float cloud = texture2D(uClouds, vec2(vUv.x + uCloudShift, vUv.y)).a;
-        vec3 lit = mix(surface, vec3(1.0), cloud * 0.85) * (0.25 + 0.95 * max(light, 0.0));
-        vec3 night = vec3(0.012, 0.02, 0.045) + surface * 0.02;
-        vec3 color = mix(night, lit, day);
-        vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
-        float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.6);
-        color += vec3(0.25, 0.55, 1.0) * rim * (0.15 + 0.85 * day);
-        gl_FragColor = vec4(color, 1.0);
-        #include <colorspace_fragment>
-      }
-    `
+const createGridLabel = (text, color) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const context = canvas.getContext('2d');
+  context.font = '700 28px monospace';
+  context.fillStyle = color;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(text, canvas.width / 2, canvas.height / 2);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(canvas),
+    transparent: true,
+    depthWrite: false
+  }));
+  sprite.scale.set(2.6, 0.65, 1);
+  return sprite;
+};
+
+const createSceneGridLabels = () => {
+  const group = new THREE.Group();
+  for (let azimuth = 0; azimuth < 360; azimuth += 30) {
+    const label = createGridLabel(`${azimuth}°`, '#cbd5e1');
+    label.position.copy(celestialPosition(azimuth, 0, 29.5, 0));
+    group.add(label);
+  }
+  [-10, -5, 0, 5, 10].forEach((distance) => {
+    const label = createGridLabel(`${distance + 10} km`, '#94a3b8');
+    label.position.set(distance, 0.12, -6.5);
+    group.add(label);
+  });
+  return group;
+};
+
+const createCrater = (radius, depth, x, z) => {
+  const geometry = new THREE.CircleGeometry(radius, 32);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x343b4c,
+    transparent: true,
+    opacity: 0.62,
+    side: THREE.DoubleSide
   });
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(EARTH_RADIUS, 64, 48), material);
   const tilt = new THREE.Group();   // 23.4° axial tilt; the mesh spins inside it

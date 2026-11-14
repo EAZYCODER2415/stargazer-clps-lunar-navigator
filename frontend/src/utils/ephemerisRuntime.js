@@ -14,6 +14,14 @@ const MONTHS = {
   Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
 };
 
+function parseEphemerisTime(value) {
+  if (value.includes('T')) return new Date(value);
+  const [date, clock] = value.split(' ');
+  const [year, month, day] = date.split('-');
+  const [hour, minute] = clock.split(':');
+  return new Date(Date.UTC(Number(year), MONTHS[month], Number(day), Number(hour), Number(minute)));
+}
+
 const sites = [malapert, monsMouton, shackleton].map((data) => ({
   ...data,
   horizon: HORIZONS[data.site.id] || null,
@@ -22,11 +30,8 @@ const sites = [malapert, monsMouton, shackleton].map((data) => ({
 }));
 
 function normalizeSample(sample) {
-  const [date, clock] = sample.t.split(' ');
-  const [year, month, day] = date.split('-');
-  const [hour, minute] = clock.split(':');
   return {
-    time: new Date(Date.UTC(Number(year), MONTHS[month], Number(day), Number(hour), Number(minute))),
+    time: parseEphemerisTime(sample.t),
     azimuth: sample.az,
     elevation: sample.el
   };
@@ -65,6 +70,13 @@ function interpolate(samples, time) {
 const calculatePosition = (body, time, latitude, longitude) => (
   interpolate(findSite(latitude, longitude)[body], time)
 );
+
+export const getBestOverlap = (latitude, longitude) => {
+  const overlap = findSite(latitude, longitude).best_overlap;
+  return overlap?.start
+    ? { hours: overlap.hours, time: parseEphemerisTime(overlap.start) }
+    : null;
+};
 
 export const calculateSunPosition = (time, latitude, longitude) => (
   calculatePosition('sun', time, latitude, longitude)

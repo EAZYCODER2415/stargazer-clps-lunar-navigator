@@ -15,6 +15,7 @@ const Header = ({
   earthVisibleHours
 }) => {
   const [isSiteMenuOpen, setIsSiteMenuOpen] = useState(false);
+  const [isVerdictOpen, setIsVerdictOpen] = useState(false);
   const sun = calculateSunPosition(time, selectedSite.latitude, selectedSite.longitude);
   const earth = calculateEarthPosition(time, selectedSite.latitude, selectedSite.longitude);
   const utcTime = time.toISOString().replace('T', ' ').replace('Z', ' UTC');
@@ -50,7 +51,7 @@ const Header = ({
           aria-haspopup="listbox"
         >
           <span>
-            <small>TARGET</small>
+            <small>LANDING SITE</small>
             {selectedSite.name} ({Math.abs(selectedSite.latitude).toFixed(2)}° S, {Math.abs(selectedSite.longitude).toFixed(2)}° E)
           </span>
           <ChevronDown aria-hidden="true" />
@@ -74,6 +75,26 @@ const Header = ({
           </div>
         )}
       </div>
+
+      <button
+        type="button"
+        className="mission-verdict mission-header-verdict"
+        onClick={() => setIsVerdictOpen((isOpen) => !isOpen)}
+        aria-expanded={isVerdictOpen}
+        aria-haspopup="dialog"
+        title="see verdict message"
+      >
+        <strong>🌍 Direct radio contact is {sun.elevation >= 0 && earth.elevation >= 0 ? 'possible' : 'impossible'}</strong>
+      </button>
+      {isVerdictOpen && (
+        <div className="mission-verdict-popup" role="dialog" aria-label="Verdict message">
+          <strong>{verdict}</strong>
+          <span>
+            {sunVisibleHours.toFixed(0)} h Sun / {earthVisibleHours.toFixed(0)} h Earth visible in this 29.53-day lunar day
+            {' · '}Celestial disc sizes exaggerated for visibility
+          </span>
+        </div>
+      )}
 
       <div className="mission-header-telemetry">
         <div className="mission-header-reading mission-header-utc">
