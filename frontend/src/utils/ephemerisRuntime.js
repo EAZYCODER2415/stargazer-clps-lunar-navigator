@@ -98,55 +98,6 @@ export const azElToCartesian = (azimuth, elevation) => {
 
 export const isAboveHorizon = (elevation, horizonMask = 0) => elevation > horizonMask;
 
-<<<<<<< HEAD
-/**
- * The skyline for a site: 360 elevation angles in degrees, one per whole degree of azimuth.
- * terrain = true uses the LOLA mask (the real ridges and dips around the site);
- * terrain = false gives the old flat horizon, kept so the two can be compared.
- */
-export const getHorizonMask = (latitude, longitude, terrain = true) => (
-  (terrain && findSite(latitude, longitude).horizon?.mask_deg) || FLAT_MASK
-);
-
-export const getHorizonInfo = (latitude, longitude) => findSite(latitude, longitude).horizon;
-
-/** Skyline elevation at any azimuth (interpolated between whole degrees). */
-export const horizonAt = (latitude, longitude, azimuth, terrain = true) => {
-  const mask = getHorizonMask(latitude, longitude, terrain);
-  const wrapped = ((azimuth % 360) + 360) % 360;
-  const lower = Math.floor(wrapped) % 360;
-  const fraction = wrapped - Math.floor(wrapped);
-  return mask[lower] * (1 - fraction) + mask[(lower + 1) % 360] * fraction;
-};
-
-/** Degrees between a body and the skyline below it. Positive = visible. */
-export const clearanceOf = (position, latitude, longitude, terrain = true) => (
-  position.elevation - horizonAt(latitude, longitude, position.azimuth, terrain)
-);
-
-export const LUNAR_DAY_HOURS = 29.53 * 24;
-
-/**
- * Find the next time a body crosses the horizon.
- * direction: 'any' (default), 'rise' (below -> above) or 'set' (above -> below).
- * windowEnd: optional Date; the search stops there, so a jump never leaves the timeline.
- */
-export const findNextHorizonTransition = (
-  time, positionCalculator, latitude, longitude, direction = 'any', windowEnd = null
-) => {
-  const stepMs = 10 * 60 * 1000;
-  const endMs = windowEnd ? windowEnd.getTime() : time.getTime() + LUNAR_DAY_HOURS * 3600000;
-  let previousVisible = isAboveHorizon(positionCalculator(time, latitude, longitude).elevation);
-
-  for (let ms = time.getTime() + stepMs; ms <= endMs; ms += stepMs) {
-    const candidateTime = new Date(ms);
-    const visible = isAboveHorizon(positionCalculator(candidateTime, latitude, longitude).elevation);
-    if (visible !== previousVisible) {
-      const kind = visible ? 'rise' : 'set';
-      if (direction === 'any' || direction === kind) {
-        return { time: candidateTime, visible, kind, hours: (ms - time.getTime()) / 3600000 };
-      }
-=======
 /** Skyline for a site: 360 angles in degrees, one per degree of azimuth. terrain=false gives a flat horizon. */
 export const getHorizonMask = (latitude, longitude, terrain = true) => (
   (terrain && HORIZONS[findSite(latitude, longitude).site.id]?.mask_deg) || FLAT_MASK
@@ -301,11 +252,7 @@ export const getVisibilityBands = (startTime, positionCalculator, latitude, long
   for (let index = 0; index <= sampleCount; index += 1) {
     const sampleTime = new Date(startTime.getTime() + (index / sampleCount) * 29.53 * 86400000);
     const visible = index < sampleCount
-<<<<<<< HEAD
-      && clearanceOf(positionCalculator(sampleTime, latitude, longitude), latitude, longitude, terrain) > 0;
-=======
       && clearanceOf(positionCalculator(sampleTime, latitude, longitude), latitude, longitude) > 0;
->>>>>>> main
 
     if (visible && bandStart === null) bandStart = index;
     if ((!visible || index === sampleCount) && bandStart !== null) {
