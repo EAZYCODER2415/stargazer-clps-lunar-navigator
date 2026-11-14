@@ -1,13 +1,16 @@
 """
 Pull hourly Sun + Earth azimuth/elevation for each landing site from JPL Horizons.
-Output: one JSON per site in ./ephemeris_long/  (this is the "already-calculated" ephemeris Liam means)
+Output: one JSON per site in ephemeris_long/ at the top of the repo  (this is the "already-calculated" ephemeris Liam means)
 Default: 118.2 days of hourly rows (4 lunar days). The first 709 rows are one lunar day (29.53 days).
 
-Run: pip install requests && python ephemeris_fetch.py
+Run (from the top of the repo): pip install requests && python backend/ephemeris_fetch.py
 No API key needed.
 
-Optional: python ephemeris_fetch.py <days> <output_folder>
-  e.g.    python ephemeris_fetch.py 29.53 my_folder   (one lunar day only)
+Optional: python backend/ephemeris_fetch.py <days> <output_folder>
+  e.g.    python backend/ephemeris_fetch.py 29.53 my_folder   (one lunar day only)
+The default output folder and the frontend data files are found from this file's location,
+so the script works from any working directory. A folder given on the command line is
+relative to where you run it.
 """
 import json, os, sys, requests, math
 from datetime import datetime, timedelta
@@ -16,7 +19,8 @@ from pathlib import Path
 API = "https://ssd.jpl.nasa.gov/api/horizons.api"
 START = "2026-12-01 00:00"       # change to the scenario start date
 DAYS = float(sys.argv[1]) if len(sys.argv) > 1 else 118.2   # default: 4 synodic months (4 lunar days)
-OUT_DIR = sys.argv[2] if len(sys.argv) > 2 else "ephemeris_long"
+REPO_ROOT = Path(__file__).resolve().parent.parent      # this file lives in backend/
+OUT_DIR = sys.argv[2] if len(sys.argv) > 2 else str(REPO_ROOT / "ephemeris_long")
 STEP = "1h"
 
 # Fact-checked 14 Nov 2026 (sources in comments).
@@ -36,12 +40,8 @@ SITES = [
 ]
 
 BODIES = {"sun": "10", "earth": "399"}
-FRONTEND_SITE_MANIFEST = (
-    Path(__file__).resolve().parent / "frontend" / "src" / "data" / "landingSites.json"
-)
-FRONTEND_EPHEMERIS_DIR = (
-    Path(__file__).resolve().parent / "frontend" / "src" / "data" / "ephemeris"
-)
+FRONTEND_SITE_MANIFEST = REPO_ROOT / "frontend" / "src" / "data" / "landingSites.json"
+FRONTEND_EPHEMERIS_DIR = REPO_ROOT / "frontend" / "src" / "data" / "ephemeris"
 
 
 def calculate_sun_position(time, latitude, longitude):

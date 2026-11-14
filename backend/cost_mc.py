@@ -9,13 +9,15 @@ Each trial samples the uncertain inputs (ASSUMPTIONS below), recomputes the
 windows, and records B. The output is a distribution (P10/P50/P90 + histogram),
 not a single number.
 
-Run:  pip install numpy
-      python cost_mc.py ephemeris_long/malapert.json
-      python cost_mc.py <ephemeris.json> <horizon_mask.json>    (with Liam's terrain mask)
+Run (from the top of the repo):
+      pip install numpy
+      python backend/cost_mc.py ephemeris_long/malapert.json
+      python backend/cost_mc.py <ephemeris.json> <horizon_mask.json>    (with Liam's terrain mask)
+The result is written next to the ephemeris file, as <name>_cost.json.
 
 MISSION LENGTH is set by the data file:
   - about one lunar day of data (709 rows): mission = one lunar day.
-  - longer data (the default from `python ephemeris_fetch.py`): the first
+  - longer data (the default from `python backend/ephemeris_fetch.py`): the first
     lunar day is only used to pick the landing time, and the mission runs for the
     rest (118.2 days of data -> 88.6-day mission = 3 lunar days).
 """

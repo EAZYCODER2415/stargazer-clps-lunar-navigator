@@ -18,10 +18,18 @@ import ComparisonPanel from './components/ComparisonPanel';
 import HelpCard from './components/HelpCard';
 import landingSites from './data/landingSites.json';
 
+const LUNAR_DAY_MS = 29.53 * 86400000;
+
 function App() {
   const initialTime = new Date('2026-12-01T00:00:00Z');
   const [time, setTime] = useState(initialTime);
   const [windowStart] = useState(initialTime);
+  // Mission time never leaves the one lunar day shown on the seek bar.
+  const windowEnd = useMemo(() => new Date(windowStart.getTime() + LUNAR_DAY_MS), [windowStart]);
+  const setClampedTime = useCallback((nextTime) => {
+    const clamped = Math.max(windowStart.getTime(), Math.min(windowEnd.getTime(), nextTime.getTime()));
+    setTime(new Date(clamped));
+  }, [windowStart, windowEnd]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeWarp, setTimeWarp] = useState(1); // 1x speed
   const [activeTool, setActiveTool] = useState('view-modes');
@@ -99,6 +107,8 @@ function App() {
   }, [selectedSite, time]);
 
   const timeInterval = useRef(null);
+  const timeRef = useRef(time);     // latest time, for the playback timer
+  useEffect(() => { timeRef.current = time; }, [time]);
 
   useEffect(() => () => clearInterval(timeInterval.current), []);
 
@@ -107,35 +117,37 @@ function App() {
     if (!isPlaying) return undefined;
 
     timeInterval.current = setInterval(() => {
-      setTime((current) => {
-        const next = new Date(current.getTime() + timeWarp * 3600000);
-        const windowEnd = new Date(windowStart.getTime() + 29.53 * 86400000);
-        return next > windowEnd ? windowStart : next;
-      });
+      // Playback stops at the end of the lunar day and holds the final positions.
+      const next = Math.min(timeRef.current.getTime() + timeWarp * 3600000, windowEnd.getTime());
+      setTime(new Date(next));
+      if (next >= windowEnd.getTime()) setIsPlaying(false);
     }, 1000);
 
     return () => clearInterval(timeInterval.current);
-  }, [isPlaying, timeWarp, windowStart]);
+  }, [isPlaying, timeWarp, windowEnd]);
 
-  const togglePlay = () => setIsPlaying((playing) => !playing);
-  const handleTimeChange = (nextTime) => setTime(nextTime);
-  const handleStep = (hours) => {
-    const next = new Date(time.getTime() + hours * 3600000);
-    const windowEnd = new Date(windowStart.getTime() + 29.53 * 86400000);
-    setTime(next < windowStart ? windowStart : next > windowEnd ? windowEnd : next);
+  const togglePlay = () => {
+    // Pressing play at the very end starts the lunar day again from the beginning.
+    if (!isPlaying && time.getTime() >= windowEnd.getTime()) setTime(windowStart);
+    setIsPlaying((playing) => !playing);
   };
+  const handleTimeChange = (nextTime) => setClampedTime(nextTime);
+  const handleStep = (hours) => setClampedTime(new Date(time.getTime() + hours * 3600000));
 
+  // Both searches stop at the end of the lunar day; null means no more rises or sets before then.
   const nextSunTransition = findNextHorizonTransition(
     time,
     calculateSunPosition,
     selectedSite.latitude,
-    selectedSite.longitude
+    selectedSite.longitude,
+    windowEnd
   );
   const nextEarthTransition = findNextHorizonTransition(
     time,
     calculateEarthPosition,
     selectedSite.latitude,
-    selectedSite.longitude
+    selectedSite.longitude,
+    windowEnd
   );
   const sunSummary = useMemo(
     () => getVisibilitySummary(windowStart, calculateSunPosition, selectedSite.latitude, selectedSite.longitude),
@@ -158,14 +170,14 @@ function App() {
     [selectedSite]
   );
   const handleJumpTo = (target) => {
-    if (target === 'best' && bestWindow) return setTime(bestWindow.time);
+    if (target === 'best' && bestWindow) return setClampedTime(bestWindow.time);
     const transition = target === 'sun' ? nextSunTransition : nextEarthTransition;
-    if (transition) setTime(transition.time);
+    if (transition) setClampedTime(transition.time);
   };
   const directRadioPossible = telemetry.isSunVisible && telemetry.isEarthVisible;
   const verdict = directRadioPossible
     ? 'Sun and Earth are visible. Array power and direct radio contact are available.'
-    : `Direct radio contact is impossible. Sun is ${telemetry.isSunVisible ? 'visible' : `down and rises in ${Math.round(nextSunTransition?.hours || 0)} hours`}; Earth is ${telemetry.isEarthVisible ? 'visible' : 'below the horizon'}.`;
+    : `Direct radio contact is impossible. Sun is ${telemetry.isSunVisible ? 'visible' : nextSunTransition ? `down and rises in ${Math.round(nextSunTransition.hours)} hours` : 'down for the rest of this lunar day'}; Earth is ${telemetry.isEarthVisible ? 'visible' : 'below the horizon'}.`;
 
   return (
     <div className="app">

@@ -818,8 +818,14 @@ header {
   padding: 0.25rem;
 }
 
+.timeline-jump-actions button:disabled {
+  border-color: rgba(71, 85, 105, 0.4);
+  color: #64748b;
+  cursor: default;
+}
+
 .camera-look-actions button:hover,
-.timeline-jump-actions button:hover,
+.timeline-jump-actions button:hover:not(:disabled),
 .compare-launch-button:hover {
   border-color: #f59e0b;
   color: #fbbf24;

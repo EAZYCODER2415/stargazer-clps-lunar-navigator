@@ -200,8 +200,12 @@ const TimelineDeck = ({
             </select>
           </div>
           <div className="timeline-jump-actions">
-            <button type="button" onClick={() => onJumpTo('sun')}>Next sunrise</button>
-            <button type="button" onClick={() => onJumpTo('earth')}>Next Earth rise</button>
+            <button type="button" onClick={() => onJumpTo('sun')} disabled={!nextSunTransition}>
+              {nextSunTransition ? 'Next sunrise' : 'Sunrise: none left this lunar day'}
+            </button>
+            <button type="button" onClick={() => onJumpTo('earth')} disabled={!nextEarthTransition}>
+              {nextEarthTransition ? 'Next Earth rise' : 'Earth rise: none left this lunar day'}
+            </button>
             <button type="button" onClick={() => onJumpTo('best')}>Best overlap</button>
             <span>{bestWindow ? `Best overlap ${bestWindow.hours.toFixed(1)} h` : 'No overlap found'}</span>
           </div>
@@ -278,8 +282,8 @@ const TimelineDeck = ({
 
           {/* Real-time status indicators */}
           <div className="timeline-deck-status">
-            <span>{telemetry.isSunVisible ? 'Next sunset' : 'Sunrise'}: {Math.round(nextSunTransition?.hours || 0)} h</span>
-            <span>{telemetry.isEarthVisible ? 'Earth visible' : 'Earth hidden'}: {Math.round(nextEarthTransition?.hours || 0)} h transition</span>
+            <span>{telemetry.isSunVisible ? 'Next sunset' : 'Sunrise'}: {nextSunTransition ? `${Math.round(nextSunTransition.hours)} h` : 'none left this lunar day'}</span>
+            <span>{telemetry.isEarthVisible ? 'Earth visible' : 'Earth hidden'}: {nextEarthTransition ? `${Math.round(nextEarthTransition.hours)} h transition` : 'no change left this lunar day'}</span>
           </div>
         </div>
       </div>
