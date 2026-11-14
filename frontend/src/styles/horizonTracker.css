@@ -176,6 +176,25 @@ header {
   font-size: 0.72rem;
 }
 
+.mission-header-verdict {
+  position: static;
+  left: auto;
+  top: auto;
+  flex: 1 1 22rem;
+  min-width: 13rem;
+  max-width: 32rem;
+  padding: 0.35rem 0.65rem;
+  transform: none;
+  text-align: left;
+}
+
+.mission-header-verdict strong,
+.mission-header-verdict span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .mission-header-site {
   position: relative;
   flex: 0 1 14rem;
@@ -1760,6 +1779,11 @@ header {
     padding-inline: 0.5rem;
   }
 
+  .mission-header-verdict {
+    min-width: 9rem;
+    max-width: 20rem;
+  }
+
   .mission-header-utc {
     display: none;
   }
@@ -1832,6 +1856,12 @@ header {
     row-gap: 0.25rem;
     min-height: 4.75rem;
     padding: 0.35rem 0.45rem;
+  }
+
+  .mission-header-verdict {
+    order: 5;
+    flex-basis: 100%;
+    max-width: none;
   }
 
   .mission-header-brand {
