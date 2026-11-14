@@ -24,6 +24,8 @@
   color: #cbd5e1;
   font-size: 0.78rem;
   line-height: 1.45;
+  max-height: calc(100vh - 11.8rem);     /* the card is longer now: scroll inside it on short screens */
+  overflow-y: auto;
 }
 
 .help-card-header {
@@ -62,6 +64,18 @@
   gap: 0.5rem;
 }
 
+.help-card h3 {
+  margin: 0.6rem 0 0;
+  color: #fbbf24;
+  font-size: 0.8rem;
+}
+
+.help-card dl.help-card-controls {
+  margin-top: 0.35rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
 .help-card dt { color: #e2e8f0; font-weight: 700; }
 
 .help-card dd { margin: 0; }
@@ -85,6 +99,11 @@
 .timeline-jump-actions button:focus-visible {
   outline: 2px solid #f59e0b;
   outline-offset: 2px;
+}
+
+/* Short laptop screens: start just under the header so the longer card fits without scrolling */
+@media (max-height: 860px) {
+  .help-card { top: 4.6rem; max-height: calc(100vh - 5.2rem); }
 }
 
 @media (max-width: 768px) {

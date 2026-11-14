@@ -46,6 +46,15 @@ function App() {
   const [cameraSensitivity, setCameraSensitivity] = useState(1.8);
   const [cameraInfo, setCameraInfo] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  // Free View flying. The 3D scene reads this every frame: `forward` / `right` are -1, 0 or 1 while
+  // move keys are held, `boost` is Shift, and `stepForward` / `stepRight` count clicks on the on-screen pad.
+  const freeMoveRef = useRef({ forward: 0, right: 0, boost: false, stepForward: 0, stepRight: 0 });
+  const handleFreeMoveKeys = useCallback((held, boost) => {
+    const moves = freeMoveRef.current;
+    moves.forward = (held.up ? 1 : 0) - (held.down ? 1 : 0);
+    moves.right = (held.right ? 1 : 0) - (held.left ? 1 : 0);
+    moves.boost = boost;
+  }, []);
   const handleLookDrag = useCallback((yawDegrees, pitchDegrees) => {
     setCameraPan((current) => ({
       yaw: current.yaw + yawDegrees,
@@ -87,13 +96,21 @@ function App() {
     };
     const increment = increments[direction];
     if (!increment) return;
+    if (viewMode === 'free') {
+      // In Free View the on-screen pad moves the camera a short hop instead of turning it.
+      // (Held keys are reported separately, through handleFreeMoveKeys.)
+      const steps = { up: [1, 0], down: [-1, 0], left: [0, -1], right: [0, 1] }[direction];
+      freeMoveRef.current.stepForward += steps[0] * amount;
+      freeMoveRef.current.stepRight += steps[1] * amount;
+      return;
+    }
     const sign = invertLook ? -1 : 1;
 
     setCameraPan((current) => ({
       yaw: current.yaw + increment.yaw * sign * amount,
       pitch: Math.max(-35, Math.min(35, current.pitch + increment.pitch * sign * amount))
     }));
-  }, [invertLook]);
+  }, [invertLook, viewMode]);
 
   const resetCameraPan = useCallback(() => setCameraPan({ yaw: 0, pitch: 0 }), []);
   const lookAt = useCallback((body) => {
@@ -199,6 +216,8 @@ function App() {
         onCameraInfo={setCameraInfo}
         cameraInfo={cameraInfo}
         showInterface={showInterface}
+        freeMoveRef={freeMoveRef}
+        lookSensitivity={cameraSensitivity}
       />
 
       <div className="overlay-container">
@@ -223,6 +242,7 @@ function App() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onPan={handleCameraPan}
+          onFreeMoveKeys={handleFreeMoveKeys}
           onResetPan={resetCameraPan}
           invertLook={invertLook}
           onInvertLookChange={setInvertLook}

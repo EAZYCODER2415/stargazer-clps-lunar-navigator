@@ -21,7 +21,8 @@ const Header = ({
   // Visible = above the real LOLA skyline, not just above 0°
   const sunUp = clearanceOf(sun, selectedSite.latitude, selectedSite.longitude) > 0;
   const earthUp = clearanceOf(earth, selectedSite.latitude, selectedSite.longitude) > 0;
-  const utcTime = time.toISOString().replace('T', ' ').replace('Z', ' UTC');
+  // To the minute: the header has to fit a 1366 px wide screen, and the timeline shows the full time.
+  const utcTime = `${time.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
   const handleSiteChange = (site) => {
     onSiteChange(site);
