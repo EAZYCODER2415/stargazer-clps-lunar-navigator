@@ -7,7 +7,7 @@ const MONTHS = {
   Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
 };
 
-const ephemerisBySite = [malapert, monsMouton, shackleton].map((data) => ({
+const sites = [malapert, monsMouton, shackleton].map((data) => ({
   ...data,
   sun: data.sun.map(normalizeSample),
   earth: data.earth.map(normalizeSample)
@@ -25,10 +25,10 @@ function normalizeSample(sample) {
 }
 
 function findSite(latitude, longitude) {
-  return ephemerisBySite.reduce((closest, site) => {
+  return sites.reduce((closest, site) => {
     const distance = Math.hypot(site.site.lat - latitude, site.site.lon - longitude);
     return distance < closest.distance ? { site, distance } : closest;
-  }, { site: ephemerisBySite[0], distance: Infinity }).site;
+  }, { site: sites[0], distance: Infinity }).site;
 }
 
 function interpolate(samples, time) {
@@ -46,9 +46,9 @@ function interpolate(samples, time) {
   };
 }
 
-function calculatePosition(body, time, latitude, longitude) {
-  return interpolate(findSite(latitude, longitude)[body], time);
-}
+const calculatePosition = (body, time, latitude, longitude) => (
+  interpolate(findSite(latitude, longitude)[body], time)
+);
 
 export const calculateSunPosition = (time, latitude, longitude) => (
   calculatePosition('sun', time, latitude, longitude)
