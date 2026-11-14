@@ -31,7 +31,7 @@ function App() {
   const [showSolarFlux, setShowSolarFlux] = useState(true);
   const [showDTELink, setShowDTELink] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
-  const [showHorizonMask, setShowHorizonMask] = useState(true);
+  const [showHorizonMask, setShowHorizonMask] = useState(false);   // survey grid over the ground: off until asked for
   const [invertLook, setInvertLook] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [showInterface, setShowInterface] = useState(true);
