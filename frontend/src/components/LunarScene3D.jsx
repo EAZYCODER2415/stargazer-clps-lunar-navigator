@@ -655,13 +655,21 @@ const LunarScene3D = ({
               {isAzimuthFullscreen && <h2 className="azimuth-overlay-heading">South Pole Map = Bird's Eye View</h2>}
               <div className="azimuth-mock-model" aria-label="Moon-centered azimuth model">
                 <svg className="azimuth-mock-trajectories" viewBox="0 0 100 100" role="img" aria-label="Sun and Earth circular trajectories">
-                  <circle className="azimuth-orbit-sun" cx="50" cy="50" r="30" />
-                  <circle className="azimuth-orbit-earth" cx="50" cy="50" r="17" />
-                  <path className="azimuth-trail-sun" d={overlaySunTrail} />
-                  <path className="azimuth-trail-earth" d={overlayEarthTrail} />
+                  {showSolarFlux && (
+                    <>
+                      <circle className="azimuth-orbit-sun" cx="50" cy="50" r="30" />
+                      <path className="azimuth-trail-sun" d={overlaySunTrail} />
+                    </>
+                  )}
+                  {showDTELink && (
+                    <>
+                      <circle className="azimuth-orbit-earth" cx="50" cy="50" r="17" />
+                      <path className="azimuth-trail-earth" d={overlayEarthTrail} />
+                    </>
+                  )}
                   <circle className="azimuth-moon" cx="50" cy="50" r="18" />
-                  <circle className="azimuth-point-sun" cx={overlaySunPoint.x} cy={overlaySunPoint.y} r="2.2" />
-                  <circle className="azimuth-point-earth" cx={overlayEarthPoint.x} cy={overlayEarthPoint.y} r="2.4" />
+                  {showSolarFlux && <circle className="azimuth-point-sun" cx={overlaySunPoint.x} cy={overlaySunPoint.y} r="2.2" />}
+                  {showDTELink && <circle className="azimuth-point-earth" cx={overlayEarthPoint.x} cy={overlayEarthPoint.y} r="2.4" />}
                 </svg>
                 <span className="azimuth-moon-label">MOON POV</span>
               </div>

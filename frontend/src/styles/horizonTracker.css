@@ -381,6 +381,10 @@ header {
   backdrop-filter: blur(10px);
 }
 
+.camera-controls.is-hidden {
+  display: none;
+}
+
 .camera-controls .control-group label {
   margin-bottom: 0.2rem;
   color: #94a3b8;
@@ -1334,7 +1338,7 @@ header {
 
 .azimuth-mock-model {
   position: absolute;
-  inset: 25% 25%;
+  inset: 10% 16%;
   display: grid;
   place-items: center;
   pointer-events: none;
