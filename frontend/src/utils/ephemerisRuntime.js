@@ -1,6 +1,13 @@
 import malapert from '../data/ephemeris/malapert.json';
 import monsMouton from '../data/ephemeris/mons-mouton.json';
 import shackleton from '../data/ephemeris/shackleton.json';
+// Real skylines from NASA LOLA elevation data (written by lola_terrain.py)
+import malapertHorizon from '../data/horizon/malapert.json';
+import monsMoutonHorizon from '../data/horizon/mons-mouton.json';
+import shackletonHorizon from '../data/horizon/shackleton.json';
+
+const HORIZONS = { malapert: malapertHorizon, 'mons-mouton': monsMoutonHorizon, shackleton: shackletonHorizon };
+const FLAT_MASK = new Array(360).fill(0);
 
 const MONTHS = {
   Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
@@ -82,14 +89,41 @@ export const azElToCartesian = (azimuth, elevation) => {
 
 export const isAboveHorizon = (elevation, horizonMask = 0) => elevation > horizonMask;
 
+/** Skyline for a site: 360 angles in degrees, one per degree of azimuth. terrain=false gives a flat horizon. */
+export const getHorizonMask = (latitude, longitude, terrain = true) => (
+  (terrain && HORIZONS[findSite(latitude, longitude).site.id]?.mask_deg) || FLAT_MASK
+);
+
+/** Skyline elevation at any azimuth (interpolated between whole degrees). */
+export const horizonAt = (latitude, longitude, azimuth, terrain = true) => {
+  const mask = getHorizonMask(latitude, longitude, terrain);
+  const wrapped = ((azimuth % 360) + 360) % 360;
+  const lower = Math.floor(wrapped) % 360;
+  const fraction = wrapped - Math.floor(wrapped);
+  return mask[lower] * (1 - fraction) + mask[(lower + 1) % 360] * fraction;
+};
+
+/** Degrees between a body and the skyline below it. Positive = visible. */
+export const clearanceOf = (position, latitude, longitude, terrain = true) => (
+  position.elevation - horizonAt(latitude, longitude, position.azimuth, terrain)
+);
+
+/** Hourly az/el samples for one body over the lunar day (used to draw sky paths). */
+export const getSkyPath = (startTime, positionCalculator, latitude, longitude) => (
+  Array.from({ length: Math.floor(29.53 * 24) + 1 }, (_, hour) => {
+    const time = new Date(startTime.getTime() + hour * 3600000);
+    return { time, ...positionCalculator(time, latitude, longitude) };
+  })
+);
+
 export const findNextHorizonTransition = (time, positionCalculator, latitude, longitude) => {
-  const initialVisible = isAboveHorizon(positionCalculator(time, latitude, longitude).elevation);
+  const initialVisible = clearanceOf(positionCalculator(time, latitude, longitude), latitude, longitude) > 0;
   const stepMs = 30 * 60 * 1000;
   const maxSteps = 29.53 * 24 * 2;
 
   for (let step = 1; step <= maxSteps; step += 1) {
     const candidateTime = new Date(time.getTime() + step * stepMs);
-    const visible = isAboveHorizon(positionCalculator(candidateTime, latitude, longitude).elevation);
+    const visible = clearanceOf(positionCalculator(candidateTime, latitude, longitude), latitude, longitude) > 0;
     if (visible !== initialVisible) {
       return {
         time: candidateTime,
@@ -110,7 +144,7 @@ export const getVisibilitySummary = (startTime, positionCalculator, latitude, lo
 
   for (let index = 0; index < sampleCount; index += 1) {
     const sampleTime = new Date(startTime.getTime() + (index / sampleCount) * durationMs);
-    const visible = isAboveHorizon(positionCalculator(sampleTime, latitude, longitude).elevation);
+    const visible = clearanceOf(positionCalculator(sampleTime, latitude, longitude), latitude, longitude) > 0;
     const sampleHours = 29.53 * 24 / sampleCount;
     if (visible) {
       visibleHours += sampleHours;
@@ -132,7 +166,7 @@ export const getVisibilityBands = (startTime, positionCalculator, latitude, long
   for (let index = 0; index <= sampleCount; index += 1) {
     const sampleTime = new Date(startTime.getTime() + (index / sampleCount) * 29.53 * 86400000);
     const visible = index < sampleCount
-      && isAboveHorizon(positionCalculator(sampleTime, latitude, longitude).elevation);
+      && clearanceOf(positionCalculator(sampleTime, latitude, longitude), latitude, longitude) > 0;
 
     if (visible && bandStart === null) bandStart = index;
     if ((!visible || index === sampleCount) && bandStart !== null) {

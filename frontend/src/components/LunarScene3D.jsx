@@ -1,450 +1,649 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { createPortal } from 'react-dom';
+import '../styles/lunarScene.css';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import {
   calculateEarthPosition,
-  calculateSunPosition
+  calculateSunPosition,
+  clearanceOf,
+  getHorizonMask,
+  getSkyPath
 } from '../utils/ephemerisRuntime';
 
-const DEG_TO_RAD = Math.PI / 180;
-const CAMERA_HEIGHT = 1.8;
+const DEG = Math.PI / 180;
 
-const getTerrainHeight = (x, z) => {
-  const ridgeHeight = Math.max(0, 3.8 * (1 - Math.hypot(x, z + 11) / 9));
-  const craterDepression = [
-    [1.4, -4.5, -4, 0.18],
-    [0.8, 4.2, -7, 0.12],
-    [2.1, -8.5, -14, 0.28],
-    [0.6, 7.5, -16, 0.1]
-  ].reduce((depth, [radius, craterX, craterZ, amount]) => {
-    const distance = Math.hypot(x - craterX, z - craterZ);
-    return depth + (distance < radius ? amount * (1 - distance / radius) : 0);
-  }, 0);
-  return Math.max(0, ridgeHeight - craterDepression);
+// ---- Scene scale (1 unit = 1 metre near the lander) ----
+const MOUND_HEIGHT = 15;           // the site sits on a local rise, like the real peaks and rims
+const MAST_HEIGHT = 3;             // POV camera sits on the lander's sensor mast
+const EYE_Y = MOUND_HEIGHT + MAST_HEIGHT;
+const SKY_RADIUS = 4000;           // Sun, Earth, paths and grid live on this sphere
+const TERRAIN_HALF = 200;
+const SKYLINE_RADIUS = 3800;       // the far terrain is drawn as a shell just inside the Sun and Earth
+
+// Real angular radii: Sun 0.27°, Earth 0.95° as seen from the Moon. Drawn larger so they read on screen.
+const SUN_EXAGGERATION = 3;
+const EARTH_EXAGGERATION = 2;
+const SUN_RADIUS = SKY_RADIUS * Math.tan(0.265 * SUN_EXAGGERATION * DEG);
+const EARTH_RADIUS = SKY_RADIUS * Math.tan(0.95 * EARTH_EXAGGERATION * DEG);
+const EARTH_SIDEREAL_DAY_MS = 23.9345 * 3600000;
+
+const SUN_COLOR = 0xfbbf24;
+const EARTH_COLOR = 0x38bdf8;
+
+/** Unit vector for an azimuth (0° = north = -Z, 90° = east = +X) and elevation. */
+const skyDirection = (azimuth, elevation) => new THREE.Vector3(
+  Math.sin(azimuth * DEG) * Math.cos(elevation * DEG),
+  Math.sin(elevation * DEG),
+  -Math.cos(azimuth * DEG) * Math.cos(elevation * DEG)
+);
+
+const skyPoint = (azimuth, elevation, radius = SKY_RADIUS) => (
+  skyDirection(azimuth, elevation).multiplyScalar(radius).add(new THREE.Vector3(0, EYE_Y, 0))
+);
+
+// ---------- Deterministic noise (so each site always looks the same) ----------
+const hash2 = (x, y, seed) => {
+  const value = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453123;
+  return value - Math.floor(value);
+};
+const smooth = (t) => t * t * (3 - 2 * t);
+const valueNoise = (x, y, seed) => {
+  const xi = Math.floor(x); const yi = Math.floor(y);
+  const xf = smooth(x - xi); const yf = smooth(y - yi);
+  const a = hash2(xi, yi, seed); const b = hash2(xi + 1, yi, seed);
+  const c = hash2(xi, yi + 1, seed); const d = hash2(xi + 1, yi + 1, seed);
+  return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
+};
+const fbm = (x, y, seed, octaves = 4) => {
+  let total = 0; let amplitude = 0.5; let frequency = 1;
+  for (let octave = 0; octave < octaves; octave += 1) {
+    total += amplitude * valueNoise(x * frequency, y * frequency, seed + octave * 13);
+    amplitude *= 0.5; frequency *= 2;
+  }
+  return total;
+};
+const seededRandom = (seed) => {
+  let state = seed * 9301 + 49297;
+  return () => {
+    state = (state * 9301 + 49297) % 233280;
+    return state / 233280;
+  };
 };
 
-const celestialPosition = (azimuth, elevation, distance, heightOffset = 0) => {
-  const azimuthRadians = azimuth * DEG_TO_RAD;
-  const elevationRadians = elevation * DEG_TO_RAD;
+// ---------- Terrain ----------
+// Two layers:
+//  1. The SKYLINE is real: it is drawn from the LOLA horizon mask, so the Sun and
+//     Earth disappear behind the actual ridges exactly when the numbers say so.
+//  2. The ground within ~200 m of the lander is ILLUSTRATIVE (LOLA's 80 m pixels
+//     cannot resolve it). It is kept below the real skyline in every direction so
+//     it can never hide something the data says is visible.
+const SITE_STYLES = {
+  malapert: { seed: 11, stretchX: 1.9, stretchZ: 0.8, spread: 60, roughness: 1.0, bigCrater: null },
+  shackleton: { seed: 23, stretchX: 1.0, stretchZ: 1.0, spread: 42, roughness: 0.8, bigCrater: { x: 95, z: 70, radius: 85, depth: 30 } },
+  'mons-mouton': { seed: 37, stretchX: 1.3, stretchZ: 1.3, spread: 85, roughness: 0.6, bigCrater: null }
+};
 
-  return new THREE.Vector3(
-    Math.sin(azimuthRadians) * distance,
-    CAMERA_HEIGHT + heightOffset + Math.sin(elevationRadians) * distance,
-    -Math.cos(azimuthRadians) * distance
+const createTerrainModel = (siteId, lowestSkylineDeg = 0) => {
+  const style = SITE_STYLES[siteId] || SITE_STYLES.malapert;
+  // If a site's skyline dips further than the mound allows for, tilt the ground down to stay under it.
+  const edgeAngle = Math.atan(EYE_Y / (TERRAIN_HALF - 10));
+  const neededAngle = (Math.abs(Math.min(0, lowestSkylineDeg)) + 1.2) * DEG;
+  const skirtSlope = Math.max(0, Math.tan(neededAngle) - Math.tan(edgeAngle));
+  const random = seededRandom(style.seed);
+  const craters = Array.from({ length: 26 }, () => {
+    const angle = random() * Math.PI * 2;
+    const distance = 14 + random() * 150;
+    const radius = 2.5 + random() * random() * 20;
+    return { x: Math.cos(angle) * distance, z: Math.sin(angle) * distance, radius, depth: radius * (0.16 + random() * 0.1) };
+  });
+  if (style.bigCrater) craters.push(style.bigCrater);
+
+  const heightAt = (x, z) => {
+    const radial = Math.hypot(x / style.stretchX, z / style.stretchZ);
+    let height = MOUND_HEIGHT * Math.exp(-((radial / style.spread) ** 2));
+    const distance = Math.hypot(x, z);
+    // Keep a flat landing pad under the lander, then let roughness grow outward.
+    const padBlend = Math.min(1, Math.max(0, (distance - 5) / 14));
+    height += (fbm(x * 0.03, z * 0.03, style.seed) - 0.5) * 2.6 * style.roughness * padBlend;
+    height += (fbm(x * 0.14, z * 0.14, style.seed + 5, 3) - 0.5) * 0.5 * padBlend;
+    craters.forEach((crater) => {
+      const d = Math.hypot(x - crater.x, z - crater.z) / crater.radius;
+      if (d < 1.5) {
+        const bowl = d < 1 ? -crater.depth * (1 - d * d) : 0;
+        const rim = crater.depth * 0.22 * Math.exp(-(((d - 1) / 0.22) ** 2));
+        height += (bowl + rim) * padBlend;
+      }
+    });
+    // Fade to the flat far plain at the edge of the detailed patch.
+    const edge = Math.min(1, Math.max(0, (TERRAIN_HALF - 10 - distance) / 40));
+    return height * edge - Math.max(0, distance - 8) * skirtSlope;
+  };
+  return { heightAt, style };
+};
+
+const createTerrainMesh = (heightAt, seed) => {
+  const segments = 180;
+  const geometry = new THREE.PlaneGeometry(TERRAIN_HALF * 2, TERRAIN_HALF * 2, segments, segments);
+  geometry.rotateX(-Math.PI / 2);
+  const position = geometry.attributes.position;
+  const colors = new Float32Array(position.count * 3);
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index); const z = position.getZ(index);
+    position.setY(index, heightAt(x, z));
+    const shade = 0.2 + fbm(x * 0.08, z * 0.08, seed + 3, 3) * 0.2;   // lunar regolith is dark grey
+    colors[index * 3] = shade * 1.02;
+    colors[index * 3 + 1] = shade;
+    colors[index * 3 + 2] = shade * 0.97;
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  mesh.receiveShadow = true;
+  mesh.castShadow = true;
+  return mesh;
+};
+
+/** Survey grid draped over the terrain: one line every 10 m. Shown by the Terrain grid toggle. */
+const createSurveyGrid = (heightAt) => {
+  const points = [];
+  const extent = 100; const spacing = 10; const step = 2;
+  for (let line = -extent; line <= extent; line += spacing) {
+    for (let along = -extent; along < extent; along += step) {
+      points.push(
+        new THREE.Vector3(line, heightAt(line, along) + 0.06, along),
+        new THREE.Vector3(line, heightAt(line, along + step) + 0.06, along + step),
+        new THREE.Vector3(along, heightAt(along, line) + 0.06, line),
+        new THREE.Vector3(along + step, heightAt(along + step, line) + 0.06, line)
+      );
+    }
+  }
+  return new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.LineBasicMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.75, toneMapped: false })
   );
 };
 
-const createCloudSprites = () => {
-  const createCloudTexture = (type) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 40;
-    const context = canvas.getContext('2d');
-    const gradient = context.createRadialGradient(32, 20, 4, 32, 20, 34);
-    gradient.addColorStop(0, 'rgba(255,255,255,0.96)');
-    gradient.addColorStop(0.55, 'rgba(255,255,255,0.76)');
-    gradient.addColorStop(1, 'rgba(255,255,255,0)');
-    context.fillStyle = gradient;
-    const shapes = type === 'cumulus'
-      ? [[10, 25, 11], [22, 16, 15], [34, 20, 18], [48, 14, 13], [56, 25, 10]]
-      : type === 'stratus'
-        ? [[8, 20, 16], [24, 19, 17], [40, 20, 18], [56, 19, 16]]
-        : [[4, 22, 7], [18, 19, 6], [31, 16, 5], [44, 13, 4], [59, 10, 3]];
-    shapes.forEach(([x, y, radius]) => {
-      context.beginPath();
-      context.arc(x, y, radius, 0, Math.PI * 2);
-      context.fill();
-    });
-    return new THREE.CanvasTexture(canvas);
-  };
-  const materials = ['cumulus', 'stratus', 'cirrus'].map((type) => new THREE.SpriteMaterial({
-    map: createCloudTexture(type),
-    transparent: true,
-    opacity: type === 'cirrus' ? 0.48 : 0.68,
-    depthWrite: false,
-    depthTest: true
-  }));
+const createRocks = (heightAt, seed) => {
+  const random = seededRandom(seed + 101);
   const group = new THREE.Group();
-  const cloudRadius = 0.806;
-  const clusterCount = 30;
-  const clusterShape = [
-    [-1.25, -0.55], [-0.55, -0.8], [0.2, -0.62], [0.95, -0.4],
-    [-1.45, 0.08], [-0.68, 0.08], [0, 0], [0.76, 0.12], [1.4, 0.2],
-    [-1.05, 0.78], [-0.25, 0.68], [0.55, 0.72], [1.12, 0.7]
-  ];
-  for (let index = 0; index < clusterCount; index += 1) {
-    const latitude = Math.acos(1 - 2 * (index + 0.5) / clusterCount) - Math.PI / 2;
-    const longitude = Math.PI * (3 - Math.sqrt(5)) * index;
-    const normal = new THREE.Vector3(
-      Math.cos(latitude) * Math.cos(longitude),
-      Math.sin(latitude),
-      Math.cos(latitude) * Math.sin(longitude)
-    );
-    const tangent = new THREE.Vector3(-normal.z, 0, normal.x).normalize();
-    const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
-    clusterShape.forEach(([tangentOffset, bitangentOffset], spriteIndex) => {
-      const position = normal.clone()
-        .multiplyScalar(cloudRadius)
-        .addScaledVector(tangent, tangentOffset * 0.024)
-        .addScaledVector(bitangent, bitangentOffset * 0.024)
-        .normalize()
-        .multiplyScalar(cloudRadius);
-      const type = index % 3 === 0 ? 'cumulus' : index % 3 === 1 ? 'stratus' : 'cirrus';
-      const sprite = new THREE.Sprite(materials[['cumulus', 'stratus', 'cirrus'].indexOf(type)]);
-      sprite.position.copy(position);
-      const scale = type === 'cumulus' ? 0.3 : type === 'stratus' ? 0.42 : 0.5;
-      sprite.scale.set(scale + (spriteIndex % 3) * 0.035, (type === 'cirrus' ? 0.07 : 0.15) + (spriteIndex % 2) * 0.035, 1);
-      group.add(sprite);
-    });
+  const material = new THREE.MeshLambertMaterial({ color: 0x8d8983, flatShading: true });
+  for (let index = 0; index < 70; index += 1) {
+    const angle = random() * Math.PI * 2;
+    const distance = 7 + random() * random() * 110;
+    const size = 0.15 + random() * random() * 1.3;
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(size, 0), material);
+    const x = Math.cos(angle) * distance; const z = Math.sin(angle) * distance;
+    rock.position.set(x, heightAt(x, z) + size * 0.35, z);
+    rock.rotation.set(random() * 3, random() * 3, random() * 3);
+    rock.scale.y = 0.6 + random() * 0.5;
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    group.add(rock);
   }
   return group;
 };
 
-const createEarthAxis = () => {
-  const axis = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, -1.12, 0),
-      new THREE.Vector3(0, 1.12, 0)
-    ]),
-    new THREE.LineBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.9 })
+/**
+ * The far landscape, drawn from the horizon mask: a bowl whose rim follows the real
+ * skyline (one point per degree of azimuth) and whose inside stands in for all the
+ * ground below it. Anything lower than the rim in a given direction is hidden by it.
+ */
+const createSkyline = (mask) => {
+  const centre = new THREE.Vector3(0, EYE_Y, 0);
+  const positions = [];
+  const nadir = new THREE.Vector3(0, EYE_Y - SKYLINE_RADIUS, 0);
+  const rim = Array.from({ length: 360 }, (_, azimuth) => skyPoint(azimuth, mask[azimuth], SKYLINE_RADIUS));
+  // Each degree: a strip from the rim down to 12° below it, then on to the point underfoot.
+  const skirt = Array.from({ length: 360 }, (_, azimuth) => skyPoint(azimuth, mask[azimuth] - 12, SKYLINE_RADIUS));
+  const push = (a, b, c) => {
+    // Wind every triangle so its front faces the observer in the middle.
+    const normal = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
+    const inward = normal.dot(new THREE.Vector3().subVectors(centre, a)) > 0;
+    (inward ? [a, b, c] : [a, c, b]).forEach((point) => positions.push(point.x, point.y, point.z));
+  };
+  for (let azimuth = 0; azimuth < 360; azimuth += 1) {
+    const next = (azimuth + 1) % 360;
+    push(rim[azimuth], rim[next], skirt[azimuth]);
+    push(rim[next], skirt[next], skirt[azimuth]);
+    push(skirt[azimuth], skirt[next], nadir);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  // Shade it as level ground: brightest when the Sun is high, dark at grazing angles.
+  const normals = new Float32Array(positions.length);
+  for (let index = 1; index < normals.length; index += 3) normals[index] = 1;
+  geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+  // Tone varies along the skyline and darkens below it, so it reads as distant land and not a flat cut-out.
+  const colors = new Float32Array(positions.length);
+  for (let index = 0; index < positions.length; index += 3) {
+    const azimuth = Math.atan2(positions[index], -positions[index + 2]) / DEG;
+    const depth = Math.min(1, Math.max(0, (EYE_Y - positions[index + 1]) / (SKYLINE_RADIUS * 0.35)));
+    const tone = (0.2 + 0.16 * fbm(azimuth * 0.11 + 40, depth * 6, 7, 4)) * (1 - 0.45 * depth);
+    colors[index] = tone * 1.02; colors[index + 1] = tone; colors[index + 2] = tone * 0.97;
+  }
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const land = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    emissive: new THREE.Color().setRGB(0.012, 0.012, 0.014)
+  }));
+  const edge = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([...rim, rim[0]].map((point) => point.clone().sub(centre).multiplyScalar(0.999).add(centre))),
+    new THREE.LineBasicMaterial({ color: 0xcbd5e1, transparent: true, opacity: 0.55 })
   );
-  axis.rotation.z = 23.4 * DEG_TO_RAD;
-  return axis;
+  const group = new THREE.Group();
+  group.add(land, edge);
+  return group;
 };
 
-const createSunRaySprite = () => {
+// ---------- Lander ----------
+const createLander = () => {
+  const lander = new THREE.Group();
+  const foil = new THREE.MeshStandardMaterial({ color: 0xd4a017, roughness: 0.55, metalness: 0.35 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0xd9dee5, roughness: 0.5, metalness: 0.4 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.8 });
+  const panel = new THREE.MeshStandardMaterial({ color: 0x1d3a8a, roughness: 0.35, metalness: 0.5, emissive: 0x0b1a44, emissiveIntensity: 0.4 });
+  const add = (mesh) => { mesh.castShadow = true; mesh.receiveShadow = true; lander.add(mesh); return mesh; };
+
+  const body = add(new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.25, 0.95, 8), foil));
+  body.position.y = 1.25;
+  const deck = add(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.08, 8), metal));
+  deck.position.y = 1.77;
+  const engine = add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.42, 0.5, 12, 1, true), dark));
+  engine.position.y = 0.55;
+
+  for (let index = 0; index < 4; index += 1) {
+    const angle = Math.PI / 4 + (index * Math.PI) / 2;
+    const footX = Math.cos(angle) * 2.0; const footZ = Math.sin(angle) * 2.0;
+    const hipX = Math.cos(angle) * 1.05; const hipZ = Math.sin(angle) * 1.05;
+    const leg = add(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1, 8), metal));
+    const hip = new THREE.Vector3(hipX, 1.3, hipZ); const foot = new THREE.Vector3(footX, 0.06, footZ);
+    leg.position.copy(hip).add(foot).multiplyScalar(0.5);
+    leg.scale.y = hip.distanceTo(foot);
+    leg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), foot.clone().sub(hip).normalize());
+    const pad = add(new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.07, 12), metal));
+    pad.position.set(footX, 0.04, footZ);
+    const tank = add(new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), metal));
+    tank.position.set(Math.cos(angle) * 0.95, 1.05, Math.sin(angle) * 0.95);
+  }
+
+  // Vertical solar panels: at the pole the Sun is always near the horizon, so panels stand upright.
+  [0, Math.PI].forEach((angle) => {
+    const wing = add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.5, 1.7), panel));
+    wing.position.set(Math.cos(angle) * 1.32, 1.6, Math.sin(angle) * 1.32);
+    wing.rotation.y = angle;
+  });
+
+  // High-gain dish. It is re-aimed at Earth every time the scene updates.
+  const dishMount = new THREE.Group();
+  dishMount.position.set(0.55, 2.05, -0.45);
+  const dish = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 20, 10, 0, Math.PI * 2, 0, Math.PI / 3.2),
+    new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.45, metalness: 0.3, side: THREE.DoubleSide })
+  );
+  dish.rotation.x = -Math.PI / 2;      // open side faces -Z, which lookAt() points at the target
+  dish.position.z = 0.42;
+  dish.castShadow = true;
+  dishMount.add(dish);
+  const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 6), metal);
+  feed.rotation.x = Math.PI / 2;
+  feed.position.z = -0.1;
+  dishMount.add(feed);
+  lander.add(dishMount);
+  const boom = add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.32, 6), metal));
+  boom.position.set(0.55, 1.93, -0.45);
+
+  // Sensor mast. The POV camera rides on top of it.
+  const mast = add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, MAST_HEIGHT - 1.8, 8), metal));
+  mast.position.y = 1.8 + (MAST_HEIGHT - 1.8) / 2;
+  const sensorHead = new THREE.Mesh(
+    new THREE.SphereGeometry(0.13, 16, 12),
+    new THREE.MeshStandardMaterial({ color: 0xff7a00, emissive: 0xff5a00, emissiveIntensity: 1.6, roughness: 0.4 })
+  );
+  sensorHead.position.y = MAST_HEIGHT;
+  lander.add(sensorHead);
+
+  // Work lights keep the lander readable during the lunar night.
+  const workLight = new THREE.Group();
+  [[0, 3.6, 0, 1], [2.8, 1.1, 2.4, 0.45], [-2.6, 1.0, -2.6, 0.35]].forEach(([x, y, z, share]) => {
+    const lamp = new THREE.PointLight(0xffe2b8, 0, 30, 1.6);
+    lamp.position.set(x, y, z);
+    lamp.userData.share = share;
+    workLight.add(lamp);
+  });
+  lander.add(workLight);
+
+  return { lander, dishMount, sensorHead, workLight };
+};
+
+// ---------- Sky ----------
+const createGlowTexture = () => {
   const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 256; canvas.height = 256;
   const context = canvas.getContext('2d');
-  const gradient = context.createRadialGradient(64, 64, 16, 64, 64, 62);
-  gradient.addColorStop(0, 'rgba(255, 247, 180, 0.9)');
-  gradient.addColorStop(0.35, 'rgba(251, 191, 36, 0.45)');
+  const gradient = context.createRadialGradient(128, 128, 6, 128, 128, 128);
+  gradient.addColorStop(0, 'rgba(255, 250, 225, 1)');
+  gradient.addColorStop(0.08, 'rgba(255, 236, 170, 0.85)');
+  gradient.addColorStop(0.25, 'rgba(251, 191, 36, 0.28)');
+  gradient.addColorStop(0.6, 'rgba(245, 158, 11, 0.06)');
   gradient.addColorStop(1, 'rgba(245, 158, 11, 0)');
   context.fillStyle = gradient;
-  context.fillRect(0, 0, 128, 128);
+  context.fillRect(0, 0, 256, 256);
   const texture = new THREE.CanvasTexture(canvas);
-  const material = new THREE.SpriteMaterial({
-    map: texture,
-    transparent: true,
-    depthWrite: false,
-    opacity: 0.62,
-    blending: THREE.AdditiveBlending
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+};
+
+/** Painted stand-in for Earth: oceans, land, ice caps. Replaced by /textures/earth_day.jpg when that file exists. */
+const createEarthTextures = () => {
+  const width = 512; const height = 256;
+  const surface = document.createElement('canvas'); surface.width = width; surface.height = height;
+  const clouds = document.createElement('canvas'); clouds.width = width; clouds.height = height;
+  const surfaceContext = surface.getContext('2d'); const cloudContext = clouds.getContext('2d');
+  const surfaceData = surfaceContext.createImageData(width, height);
+  const cloudData = cloudContext.createImageData(width, height);
+  for (let y = 0; y < height; y += 1) {
+    const latitude = (0.5 - y / height) * Math.PI;
+    for (let x = 0; x < width; x += 1) {
+      const longitude = (x / width) * Math.PI * 2;
+      // Sample noise on the sphere so the texture has no seam.
+      const px = Math.cos(latitude) * Math.cos(longitude); const py = Math.sin(latitude); const pz = Math.cos(latitude) * Math.sin(longitude);
+      const land = fbm(px * 1.6 + 5.2, pz * 1.6 + py * 1.9 + 1.3, 71, 5) + 0.18 * fbm(py * 3 + 9, px * 3 + pz * 2, 12, 3);
+      const offset = (y * width + x) * 4;
+      const polar = Math.abs(latitude) / (Math.PI / 2);
+      let r; let g; let b;
+      if (polar > 0.86 - 0.08 * fbm(px * 4, pz * 4, 5, 2)) { r = 236; g = 242; b = 247; }
+      else if (land > 0.6) {
+        const dry = fbm(px * 5 + 3, pz * 5 + py * 4, 33, 3);
+        const tropics = 1 - Math.min(1, polar * 1.6);
+        r = 60 + dry * 110 + (1 - tropics) * 20; g = 96 + tropics * 40 + dry * 30; b = 48 + dry * 40;
+      } else {
+        const depth = Math.max(0, (0.6 - land) * 2.2);
+        r = 14 + 22 * (1 - depth); g = 62 + 60 * (1 - depth); b = 128 + 62 * (1 - depth);
+      }
+      surfaceData.data[offset] = r; surfaceData.data[offset + 1] = g; surfaceData.data[offset + 2] = b; surfaceData.data[offset + 3] = 255;
+      const cloud = fbm(px * 2.6 + 11, pz * 2.6 + py * 5.5, 97, 5);
+      const cover = Math.max(0, Math.min(1, (cloud - 0.5) * 4.5));
+      cloudData.data[offset] = 255; cloudData.data[offset + 1] = 255; cloudData.data[offset + 2] = 255; cloudData.data[offset + 3] = cover * 255;
+    }
+  }
+  surfaceContext.putImageData(surfaceData, 0, 0);
+  cloudContext.putImageData(cloudData, 0, 0);
+  const toTexture = (canvas) => {
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    return texture;
+  };
+  return { surface: toTexture(surface), clouds: toTexture(clouds) };
+};
+
+/** Earth with a real day/night terminator: it is lit from the Sun's direction even when the Sun is below our horizon. */
+const createEarth = () => {
+  const textures = createEarthTextures();
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uSurface: { value: textures.surface },
+      uClouds: { value: textures.clouds },
+      uSunDirection: { value: new THREE.Vector3(1, 0, 0) },
+      uCloudShift: { value: 0 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPosition;
+      void main() {
+        vUv = uv;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uSurface;
+      uniform sampler2D uClouds;
+      uniform vec3 uSunDirection;
+      uniform float uCloudShift;
+      varying vec2 vUv;
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPosition;
+      void main() {
+        vec3 normal = normalize(vWorldNormal);
+        float light = dot(normal, normalize(uSunDirection));
+        float day = smoothstep(-0.08, 0.22, light);
+        vec3 surface = texture2D(uSurface, vUv).rgb;
+        float cloud = texture2D(uClouds, vec2(vUv.x + uCloudShift, vUv.y)).a;
+        vec3 lit = mix(surface, vec3(1.0), cloud * 0.85) * (0.25 + 0.95 * max(light, 0.0));
+        vec3 night = vec3(0.012, 0.02, 0.045) + surface * 0.02;
+        vec3 color = mix(night, lit, day);
+        vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+        float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 2.6);
+        color += vec3(0.25, 0.55, 1.0) * rim * (0.15 + 0.85 * day);
+        gl_FragColor = vec4(color, 1.0);
+        #include <colorspace_fragment>
+      }
+    `
   });
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(3.2, 3.2, 1);
-  return sprite;
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(EARTH_RADIUS, 64, 48), material);
+  const tilt = new THREE.Group();   // 23.4° axial tilt; the mesh spins inside it
+  tilt.rotation.z = 23.4 * DEG;
+  tilt.add(mesh);
+
+  // Optional real imagery: drop a public-domain NASA Blue Marble image at
+  // frontend/public/textures/earth_day.jpg and it replaces the painted surface.
+  new THREE.TextureLoader().load('/textures/earth_day.jpg', (texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    material.uniforms.uSurface.value = texture;
+  }, undefined, () => {});
+
+  return { group: tilt, mesh, material };
 };
 
 const createStars = () => {
-  const positions = [];
-  for (let index = 0; index < 280; index += 1) {
-    const azimuth = ((index * 137.5) % 360) * DEG_TO_RAD;
-    const elevation = (((index * 83.7) % 100) - 25) * DEG_TO_RAD;
-    const distance = 42 + (index % 11);
-    positions.push(
-      Math.sin(azimuth) * Math.cos(elevation) * distance,
-      Math.sin(elevation) * distance + 2,
-      -Math.cos(azimuth) * Math.cos(elevation) * distance
-    );
+  const random = seededRandom(4242);
+  const positions = []; const colors = [];
+  for (let index = 0; index < 3200; index += 1) {
+    const u = random() * 2 - 1; const theta = random() * Math.PI * 2;
+    const ring = Math.sqrt(1 - u * u);
+    positions.push(ring * Math.cos(theta) * 5000, u * 5000 + EYE_Y, ring * Math.sin(theta) * 5000);
+    const brightness = 0.35 + random() * random() * 0.65;
+    const warmth = random();
+    colors.push(brightness * (0.85 + warmth * 0.15), brightness * 0.92, brightness * (1 - warmth * 0.18));
   }
-
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  const material = new THREE.PointsMaterial({
-    color: 0xbfd7ff,
-    size: 0.12,
-    sizeAttenuation: true,
-    transparent: true,
-    opacity: 0.82
-  });
-  return new THREE.Points(geometry, material);
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  return new THREE.Points(geometry, new THREE.PointsMaterial({
+    size: 1.7, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 1, depthWrite: false
+  }));
 };
 
-const createGridLabel = (text, color) => {
+const createTextSprite = (text, color = '#cbd5e1', scale = 1) => {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 64;
   const context = canvas.getContext('2d');
-  context.font = '700 28px monospace';
+  const fontSize = 44;
+  context.font = `600 ${fontSize}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+  canvas.width = Math.ceil(context.measureText(text).width) + 24;
+  canvas.height = fontSize + 20;
+  context.font = `600 ${fontSize}px ui-monospace, SFMono-Regular, Menlo, monospace`;
   context.fillStyle = color;
-  context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText(text, canvas.width / 2, canvas.height / 2);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: new THREE.CanvasTexture(canvas),
-    transparent: true,
-    depthWrite: false
-  }));
-  sprite.scale.set(2.6, 0.65, 1);
+  context.fillText(text, 12, canvas.height / 2);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, opacity: 0.9 }));
+  const height = SKY_RADIUS * 0.022 * scale;
+  sprite.scale.set(height * (canvas.width / canvas.height), height, 1);
   return sprite;
 };
 
-const createSceneGridLabels = () => {
+/** Sky grid: a meridian every 30° of azimuth, and elevation rings packed near the horizon where everything happens. */
+const createSkyGrid = () => {
   const group = new THREE.Group();
-  for (let azimuth = 0; azimuth < 360; azimuth += 30) {
-    const label = createGridLabel(`${azimuth}°`, '#cbd5e1');
-    label.position.copy(celestialPosition(azimuth, 0, 29.5, 0));
-    group.add(label);
-  }
-  [-10, -5, 0, 5, 10].forEach((distance) => {
-    const label = createGridLabel(`${distance + 10} km`, '#94a3b8');
-    label.position.set(distance, 0.12, -6.5);
-    group.add(label);
-  });
-  return group;
-};
-
-const createCrater = (radius, depth, x, z) => {
-  const geometry = new THREE.CircleGeometry(radius, 32);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x343b4c,
-    transparent: true,
-    opacity: 0.62,
-    side: THREE.DoubleSide
-  });
-  const crater = new THREE.Mesh(geometry, material);
-  crater.rotation.x = -Math.PI / 2;
-  crater.position.set(x, 0.016 + depth, z);
-  return crater;
-};
-
-const createTrajectory = (color) => {
-  const material = new THREE.LineDashedMaterial({
-    color,
-    transparent: true,
-    opacity: 0.92,
-    dashSize: 0.7,
-    gapSize: 0.22,
-    depthTest: false
-  });
-  const geometry = new THREE.BufferGeometry();
-  const trajectory = new THREE.Line(geometry, material);
-  trajectory.renderOrder = 20;
-  return trajectory;
-};
-
-const getOverlayOrbitPoint = (azimuth, radius) => {
-  const angle = (azimuth - 90) * DEG_TO_RAD;
-  return {
-    x: 50 + Math.cos(angle) * radius,
-    y: 50 + Math.sin(angle) * radius
-  };
-};
-
-const getOverlayTrailPath = (azimuth, radius, sweep = 72) => {
-  const start = getOverlayOrbitPoint(azimuth - sweep, radius);
-  const end = getOverlayOrbitPoint(azimuth, radius);
-  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 0 1 ${end.x} ${end.y}`;
-};
-
-const createAzimuthGrid = () => {
-  const group = new THREE.Group();
-  const domeRadius = 28;
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x7c8ba1, transparent: true, opacity: 0.3 });
+  const fineMaterial = new THREE.LineBasicMaterial({ color: 0x7c8ba1, transparent: true, opacity: 0.16 });
+  const radius = SKY_RADIUS * 1.02;   // just behind the Sun and Earth discs
   for (let azimuth = 0; azimuth < 360; azimuth += 30) {
     const points = [];
-    for (let elevation = 0; elevation <= 75; elevation += 3) {
-      points.push(celestialPosition(azimuth, elevation, domeRadius, 0));
+    for (let elevation = 0; elevation <= 30; elevation += 1) points.push(skyPoint(azimuth, elevation, radius));
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), lineMaterial));
+    const cardinal = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[azimuth];
+    const label = createTextSprite(cardinal ? `${cardinal} ${azimuth}°` : `${azimuth}°`, cardinal ? '#f8fafc' : '#94a3b8', cardinal ? 1.15 : 0.85);
+    label.position.copy(skyPoint(azimuth, 0.9, radius));
+    group.add(label);
+  }
+  [1, 2, 3, 5, 10, 15, 20, 30].forEach((elevation) => {
+    const points = Array.from({ length: 181 }, (_, index) => skyPoint(index * 2, elevation, radius));
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), elevation < 5 ? fineMaterial : lineMaterial));
+    if (elevation >= 2) {
+      [15, 105, 195, 285].forEach((azimuth) => {
+        const label = createTextSprite(`${elevation}°`, '#94a3b8', 0.75);
+        label.position.copy(skyPoint(azimuth, elevation + 0.35, radius));
+        group.add(label);
+      });
     }
-    const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.34 })
-    );
-    group.add(line);
-  }
-  for (let elevation = 0; elevation <= 75; elevation += 5) {
-    const points = Array.from({ length: 73 }, (_, index) => (
-      celestialPosition(index * 5, elevation, domeRadius, 0)
-    ));
-    group.add(new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.28 })
-    ));
-  }
+  });
   return group;
 };
 
-const createCraterRim = () => {
-  const points = [];
-  for (let index = 0; index <= 32; index += 1) {
-    const angle = (index / 32) * Math.PI * 2;
-    points.push(new THREE.Vector3(
-      Math.cos(angle) * 9,
-      1.65 + Math.sin(angle * 4) * 0.08,
-      -11 + Math.sin(angle) * 2.8
-    ));
-  }
-  return new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(points),
-    new THREE.LineBasicMaterial({ color: 0xcbd5e1, transparent: true, opacity: 0.7 })
-  );
+const createFatLine = (color, linewidth, opacity) => {
+  const material = new LineMaterial({ color, linewidth, transparent: true, opacity, depthWrite: false });
+  const line = new Line2(new LineGeometry(), material);
+  line.frustumCulled = false;
+  return line;
 };
+
+const setFatLinePoints = (line, points) => {
+  if (points.length < 2) { line.visible = false; return; }
+  const flat = new Float32Array(points.length * 3);
+  points.forEach((point, index) => { flat[index * 3] = point.x; flat[index * 3 + 1] = point.y; flat[index * 3 + 2] = point.z; });
+  line.geometry.dispose();
+  line.geometry = new LineGeometry();
+  line.geometry.setPositions(flat);
+  line.computeLineDistances();
+};
+
+const disposeObject = (object) => {
+  object.traverse((child) => {
+    child.geometry?.dispose();
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    materials.filter(Boolean).forEach((material) => { material.map?.dispose(); material.dispose(); });
+  });
+};
+
+const formatSigned = (value, digits = 2) => `${value >= 0 ? '+' : ''}${value.toFixed(digits)}°`;
 
 const LunarScene3D = ({
   time,
+  windowStart,
   selectedSite,
   showSolarFlux,
   showDTELink,
   showGrid,
   showHorizonMask,
+  useTerrain,
   cameraYaw,
   cameraPitch,
+  viewMode,
+  viewResetCount,
+  invertLook,
+  onLookDrag,
+  onCameraInfo,
+  cameraInfo,
   showInterface
 }) => {
-  const [popup, setPopup] = useState(null);
   const [fps, setFps] = useState(0);
-  const [azimuthHost, setAzimuthHost] = useState(null);
-  const [isAzimuthVisible, setIsAzimuthVisible] = useState(true);
-  const [isAzimuthFullscreen, setIsAzimuthFullscreen] = useState(false);
-  const [azimuthScrollVisible, setAzimuthScrollVisible] = useState(false);
-  const [azimuthScrollAt, setAzimuthScrollAt] = useState({ top: true, bottom: false });
-  const azimuthScrollRef = useRef(null);
-  const azimuthScrollTimerRef = useRef(null);
+  const [hover, setHover] = useState(null);
+  const [isCompassVisible, setIsCompassVisible] = useState(true);
   const containerRef = useRef(null);
-  const sceneRef = useRef(null);
-  const cameraRef = useRef(null);
-  const rendererRef = useRef(null);
-  const layersRef = useRef(null);
-  const frameRef = useRef(null);
+  const stageRef = useRef(null);       // everything created once
+  const siteRef = useRef(null);        // everything rebuilt per site
+  const propsRef = useRef({ cameraYaw, cameraPitch, viewMode, invertLook, onLookDrag, onCameraInfo });
 
+  // Latest props for the render loop and pointer handlers, which are set up only once.
   useEffect(() => {
-    setAzimuthHost(document.querySelector('.azimuth-layer'));
-  }, []);
+    propsRef.current = { cameraYaw, cameraPitch, viewMode, invertLook, onLookDrag, onCameraInfo };
+  });
 
-  useEffect(() => () => clearTimeout(azimuthScrollTimerRef.current), []);
-
-  const updateAzimuthScroll = () => {
-    const element = azimuthScrollRef.current;
-    if (!element) return;
-    const maxScroll = element.scrollHeight - element.clientHeight;
-    setAzimuthScrollAt({
-      top: element.scrollTop <= 2,
-      bottom: maxScroll <= 2 || element.scrollTop >= maxScroll - 2
-    });
-    setAzimuthScrollVisible(true);
-    clearTimeout(azimuthScrollTimerRef.current);
-    azimuthScrollTimerRef.current = setTimeout(() => setAzimuthScrollVisible(false), 900);
-  };
-
-  const nudgeAzimuthScroll = (direction) => {
-    azimuthScrollRef.current?.scrollBy({ top: direction * 220, behavior: 'smooth' });
-    updateAzimuthScroll();
-  };
-
+  // ---- One-time setup: renderer, sky, lander, input ----
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return undefined;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x05070d);
-    scene.fog = new THREE.Fog(0x05070d, 28, 58);
+    scene.background = new THREE.Color(0x000004);
 
-    const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 100);
-    camera.position.set(0, CAMERA_HEIGHT, 0);
+    const camera = new THREE.PerspectiveCamera(62, 1, 0.4, 14000);
+    camera.position.set(0, EYE_Y + 0.25, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
-    scene.add(new THREE.HemisphereLight(0x64748b, 0x111827, 1.2));
-    const moonLight = new THREE.DirectionalLight(0xf8fafc, 1.6);
-    moonLight.position.set(-5, 12, 4);
-    scene.add(moonLight);
+    // Sunlight: direction and strength are set from the ephemeris on every update.
+    const sunLight = new THREE.DirectionalLight(0xfff4e0, 0);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    Object.assign(sunLight.shadow.camera, { left: -90, right: 90, top: 90, bottom: -90, near: 1, far: 900 });
+    sunLight.shadow.bias = -0.0006;
+    sunLight.shadow.normalBias = 0.35;
+    sunLight.target.position.set(0, MOUND_HEIGHT, 0);
+    scene.add(sunLight, sunLight.target);
+    // Earthshine: faint blue fill from Earth's direction, so night is dark but not blind.
+    const earthLight = new THREE.DirectionalLight(0x8fb4ff, 0);
+    scene.add(earthLight);
+    scene.add(new THREE.HemisphereLight(0x9fb2d8, 0x30343c, 0.16));   // starlight: night is dark, not blind
 
-    const terrain = new THREE.Mesh(
-      new THREE.PlaneGeometry(90, 90, 24, 24),
-      new THREE.MeshStandardMaterial({ color: 0x151c2d, roughness: 1 })
-    );
-    terrain.rotation.x = -Math.PI / 2;
-    scene.add(terrain);
-
-    const ridge = new THREE.Mesh(
-      new THREE.ConeGeometry(9, 3.8, 8),
-      new THREE.MeshStandardMaterial({ color: 0x232c40, roughness: 1 })
-    );
-    ridge.position.set(0, 1.4, -11);
-    scene.add(ridge);
-
-    [
-      [1.4, -0.02, -4.5, -4],
-      [0.8, 0.01, 4.2, -7],
-      [2.1, -0.01, -8.5, -14],
-      [0.6, 0.02, 7.5, -16]
-    ].forEach(([radius, depth, x, z]) => scene.add(createCrater(radius, depth, x, z)));
-
-    const grid = new THREE.GridHelper(40, 16, 0x475569, 0x334155);
-    grid.position.y = 0.025;
-    grid.material.transparent = true;
-    grid.material.opacity = 0.2;
-    scene.add(grid);
-
-    const horizonMask = new THREE.Mesh(
-      new THREE.RingGeometry(14, 14.06, 96),
-      new THREE.MeshBasicMaterial({
-        color: 0x60a5fa,
-        transparent: true,
-        opacity: 0.4,
-        side: THREE.DoubleSide
-      })
-    );
-    horizonMask.rotation.x = -Math.PI / 2;
-    horizonMask.position.y = 0.04;
-    scene.add(horizonMask);
-
-    const sun = new THREE.Mesh(
-      new THREE.SphereGeometry(0.55, 24, 24),
-      new THREE.MeshBasicMaterial({ color: 0xfbbf24 })
-    );
-    const earth = new THREE.Mesh(
-      new THREE.SphereGeometry(0.8, 24, 24),
-      new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x0c4a6e, emissiveIntensity: 0.45 })
-    );
-    const earthClouds = createCloudSprites();
-    earth.add(earthClouds);
-    earth.add(createEarthAxis());
-
-    const sunRays = createSunRaySprite();
-    sun.add(sunRays);
-    earth.rotation.z = 23.4 * DEG_TO_RAD;
-    scene.add(sun, earth);
-
-    const lander = new THREE.Group();
-    const landerBody = new THREE.Mesh(
-      new THREE.BoxGeometry(1.3, 0.65, 1),
-      new THREE.MeshStandardMaterial({
-        color: 0xf97316,
-        emissive: 0x9a3412,
-        emissiveIntensity: 0.45,
-        metalness: 0.35,
-        roughness: 0.7,
-        polygonOffset: true,
-        polygonOffsetFactor: -2
-      })
-    );
-    landerBody.position.y = 0.9;
-    lander.add(landerBody);
-    [-0.5, 0.5].forEach((x) => {
-      const leg = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.035, 0.035, 1.1, 8),
-        new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.5 })
-      );
-      leg.position.set(x, 0.45, 0);
-      leg.rotation.z = x < 0 ? -0.28 : 0.28;
-      lander.add(leg);
-    });
-    lander.position.set(0, getTerrainHeight(0, -8), -8);
-    lander.scale.setScalar(1.35);
-    scene.add(lander);
     const stars = createStars();
     scene.add(stars);
 
-    const solarTrajectory = createTrajectory(0xf59e0b);
-    const earthTrajectory = createTrajectory(0x38bdf8);
-    const craterRim = createCraterRim();
-    const azimuthGrid = createAzimuthGrid();
-    const sceneGridLabels = createSceneGridLabels();
-    scene.add(solarTrajectory, earthTrajectory, craterRim, azimuthGrid, sceneGridLabels);
+    const sun = new THREE.Mesh(
+      new THREE.SphereGeometry(SUN_RADIUS, 32, 24),
+      new THREE.MeshBasicMaterial({ color: 0xfff6d8, toneMapped: false })
+    );
+    const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: createGlowTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false
+    }));
+    sunGlow.scale.setScalar(SUN_RADIUS * 14);
+    sun.add(sunGlow);
+    scene.add(sun);
+
+    const earth = createEarth();
+    scene.add(earth.group);
+
+    const skyGrid = createSkyGrid();
+    scene.add(skyGrid);
+
+    const sunPath = createFatLine(SUN_COLOR, 1.6, 0.42);
+    const sunTrail = createFatLine(SUN_COLOR, 3.2, 0.95);
+    const earthPath = createFatLine(EARTH_COLOR, 1.6, 0.42);
+    const earthTrail = createFatLine(EARTH_COLOR, 3.2, 0.95);
+    const linkBeam = createFatLine(0x7dd3fc, 1.4, 0.55);
+    scene.add(sunPath, sunTrail, earthPath, earthTrail, linkBeam);
+    const fatLines = [sunPath, sunTrail, earthPath, earthTrail, linkBeam];
+
+    const { lander, dishMount, sensorHead, workLight } = createLander();
+    lander.position.y = MOUND_HEIGHT;
+    scene.add(lander);
+
+    // Free View: orbit around the lander. Limits stop the camera going under the ground.
+    const orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enabled = false;
+    orbit.enableDamping = true;
+    orbit.dampingFactor = 0.08;
+    orbit.target.set(0, MOUND_HEIGHT + 1.2, 0);
+    orbit.minDistance = 5;
+    orbit.maxDistance = 180;
+    orbit.maxPolarAngle = Math.PI / 2 - 0.02;
 
     const resize = () => {
       const { width, height } = container.getBoundingClientRect();
@@ -452,239 +651,310 @@ const LunarScene3D = ({
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height, false);
+      fatLines.forEach((line) => line.material.resolution.set(width, height));
     };
-
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(container);
     resize();
 
-    sceneRef.current = scene;
-    cameraRef.current = camera;
-    rendererRef.current = renderer;
-    layersRef.current = {
-      grid,
-      horizonMask,
-      sun,
-      earth,
-      solarTrajectory,
-      earthTrajectory
-      ,
-      craterRim,
-      azimuthGrid,
-      sceneGridLabels,
-      earthClouds,
-      sunRays
+    // ---- Pointer input ----
+    const canvas = renderer.domElement;
+    const drag = { active: false, x: 0, y: 0 };
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let lastHoverCheck = 0;
+
+    const onPointerDown = (event) => {
+      if (propsRef.current.viewMode !== 'surface') return;
+      drag.active = true; drag.x = event.clientX; drag.y = event.clientY;
+      canvas.setPointerCapture?.(event.pointerId);
+      canvas.style.cursor = 'grabbing';
+    };
+    const onPointerMove = (event) => {
+      if (drag.active) {
+        const degreesPerPixel = camera.fov / container.clientHeight;
+        const direction = propsRef.current.invertLook ? -1 : 1;
+        propsRef.current.onLookDrag?.(
+          (event.clientX - drag.x) * degreesPerPixel * direction,
+          (event.clientY - drag.y) * degreesPerPixel * direction
+        );
+        drag.x = event.clientX; drag.y = event.clientY;
+        return;
+      }
+      const now = performance.now();
+      if (now - lastHoverCheck < 80) return;
+      lastHoverCheck = now;
+      const rect = canvas.getBoundingClientRect();
+      pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(pointer, camera);
+      const belongsTo = (object, root) => { for (let node = object; node; node = node.parent) if (node === root) return true; return false; };
+      const hit = raycaster.intersectObjects([sun, earth.mesh, lander], true).find((candidate) => candidate.object.visible && candidate.distance > 1);
+      let key = null;
+      if (hit) key = belongsTo(hit.object, sun) ? 'sun' : hit.object === earth.mesh ? 'earth' : 'lander';
+      setHover((current) => {
+        if (!key) return current ? null : current;
+        return { key, x: event.clientX, y: event.clientY };
+      });
+    };
+    const endDrag = (event) => {
+      drag.active = false;
+      canvas.releasePointerCapture?.(event.pointerId);
+      canvas.style.cursor = propsRef.current.viewMode === 'surface' ? 'grab' : 'default';
+    };
+    const onWheel = (event) => {
+      if (propsRef.current.viewMode !== 'surface') return;
+      event.preventDefault();
+      camera.fov = Math.max(8, Math.min(80, camera.fov * (event.deltaY > 0 ? 1.08 : 1 / 1.08)));
+      camera.updateProjectionMatrix();
+    };
+    const onPointerLeave = () => setHover(null);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('pointerleave', onPointerLeave);
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+
+    stageRef.current = {
+      scene, camera, renderer, orbit, sunLight, earthLight, stars, sun, sunGlow, earth,
+      skyGrid, sunPath, sunTrail, earthPath, earthTrail, linkBeam,
+      lander, dishMount, sensorHead, workLight, mode: null, keyLightAzimuth: 0
     };
 
     let frameCount = 0;
     let fpsWindowStart = performance.now();
+    let lastInfo = { centerAz: -1, fov: -1, at: 0 };
+    const forward = new THREE.Vector3();
+    let frame;
     const render = () => {
-      frameRef.current = requestAnimationFrame(render);
-      frameCount += 1;
+      frame = requestAnimationFrame(render);
+      if (document.hidden) return;
       const now = performance.now();
+      frameCount += 1;
       if (now - fpsWindowStart >= 1000) {
         setFps(Math.round((frameCount * 1000) / (now - fpsWindowStart)));
-        frameCount = 0;
-        fpsWindowStart = now;
+        frameCount = 0; fpsWindowStart = now;
       }
-      earth.rotation.y += 0.0008;
+      const stage = stageRef.current;
+      const { viewMode: mode, cameraYaw: yaw, cameraPitch: pitch } = propsRef.current;
+      if (stage.mode !== mode) {
+        stage.mode = mode;
+        if (mode === 'free') {
+          camera.fov = 50; camera.updateProjectionMatrix();
+          // Start on the sunlit side of the lander (or the Earth side at night).
+          const side = (stage.keyLightAzimuth + 38) * DEG;
+          camera.position.set(Math.sin(side) * 19, MOUND_HEIGHT + 4.5, -Math.cos(side) * 19);
+          orbit.target.set(0, MOUND_HEIGHT + 1.2, 0);
+          orbit.enabled = true;
+          canvas.style.cursor = 'default';
+        } else {
+          orbit.enabled = false;
+          camera.fov = 62; camera.updateProjectionMatrix();
+          camera.position.set(0, EYE_Y + 0.25, 0);
+          canvas.style.cursor = 'grab';
+        }
+        sensorHead.visible = mode === 'free';   // don't put the sensor inside the POV camera
+      }
+      if (mode === 'free') orbit.update();
+      else camera.rotation.set(pitch * DEG, yaw * DEG, 0, 'YXZ');
 
-      if (!document.hidden) {
-        sunRays.material.opacity = 0.48 + Math.sin(performance.now() * 0.0015) * 0.12;
-        earthClouds.rotation.y += 0.0011;
+      sunGlow.material.opacity = 0.92 + Math.sin(now * 0.0012) * 0.05;
+      earth.material.uniforms.uCloudShift.value = (now * 0.0000035) % 1;
+
+      camera.getWorldDirection(forward);
+      const centerAz = (Math.atan2(forward.x, -forward.z) / DEG + 360) % 360;
+      if (now - lastInfo.at > 120 && (Math.abs(centerAz - lastInfo.centerAz) > 0.05 || camera.fov !== lastInfo.fov)) {
+        lastInfo = { centerAz, fov: camera.fov, at: now };
+        propsRef.current.onCameraInfo?.({ centerAz, fov: camera.fov });
       }
       renderer.render(scene, camera);
     };
     render();
 
     return () => {
-      cancelAnimationFrame(frameRef.current);
+      cancelAnimationFrame(frame);
       resizeObserver.disconnect();
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', endDrag);
+      canvas.removeEventListener('pointercancel', endDrag);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
+      canvas.removeEventListener('wheel', onWheel);
+      orbit.dispose();
+      disposeObject(scene);
       renderer.dispose();
       renderer.domElement.remove();
-      scene.clear();
-      sceneRef.current = null;
-      cameraRef.current = null;
-      rendererRef.current = null;
-      layersRef.current = null;
+      stageRef.current = null;
+      siteRef.current = null;
     };
   }, []);
 
+  // Reset view also restores the default zoom.
   useEffect(() => {
-    const camera = cameraRef.current;
-    if (!camera) return;
-    camera.rotation.set(cameraPitch * DEG_TO_RAD, cameraYaw * DEG_TO_RAD, 0, 'YXZ');
-  }, [cameraYaw, cameraPitch]);
+    if (!stageRef.current || !viewResetCount) return;
+    stageRef.current.camera.fov = 62;
+    stageRef.current.camera.updateProjectionMatrix();
+  }, [viewResetCount]);
 
+  // ---- Per-site: terrain, rocks, survey grid, full-lunar-day sky paths ----
   useEffect(() => {
-    const layers = layersRef.current;
-    if (!layers) return;
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+    const mask = getHorizonMask(selectedSite.latitude, selectedSite.longitude, useTerrain);
+    const { heightAt, style } = createTerrainModel(selectedSite.id, Math.min(...mask));
+    const terrain = createTerrainMesh(heightAt, style.seed);
+    const rocks = createRocks(heightAt, style.seed);
+    const surveyGrid = createSurveyGrid(heightAt);
+    const group = new THREE.Group();
+    group.add(terrain, rocks, surveyGrid, createSkyline(mask));
+    stage.scene.add(group);
 
-    layers.grid.visible = showGrid;
-    layers.horizonMask.visible = showHorizonMask;
+    const toPoints = (path, radius) => path.map((sample) => skyPoint(sample.azimuth, sample.elevation, radius));
+    const sunSamples = getSkyPath(windowStart, calculateSunPosition, selectedSite.latitude, selectedSite.longitude);
+    const earthSamples = getSkyPath(windowStart, calculateEarthPosition, selectedSite.latitude, selectedSite.longitude);
+    setFatLinePoints(stage.sunPath, toPoints(sunSamples, SKY_RADIUS * 0.99));
+    setFatLinePoints(stage.earthPath, toPoints(earthSamples, SKY_RADIUS * 0.99));
+    siteRef.current = { group, surveyGrid, sunSamples, earthSamples };
+
+    return () => {
+      stage.scene.remove(group);
+      disposeObject(group);
+      siteRef.current = null;
+    };
+  }, [selectedSite, windowStart, useTerrain]);
+
+  // ---- Per-time: place the Sun and Earth, light the scene, update trails ----
+  useEffect(() => {
+    const stage = stageRef.current;
+    const site = siteRef.current;
+    if (!stage || !site) return;
 
     const sunPosition = calculateSunPosition(time, selectedSite.latitude, selectedSite.longitude);
     const earthPosition = calculateEarthPosition(time, selectedSite.latitude, selectedSite.longitude);
-    layers.sun.position.copy(celestialPosition(sunPosition.azimuth, sunPosition.elevation, 18, 1.1));
-    layers.earth.position.copy(celestialPosition(earthPosition.azimuth, earthPosition.elevation, 17, 1.1));
-    layers.sun.visible = sunPosition.elevation >= 0;
-    layers.earth.visible = earthPosition.elevation >= 0;
+    const sunClearance = clearanceOf(sunPosition, selectedSite.latitude, selectedSite.longitude, useTerrain);
+    const earthClearance = clearanceOf(earthPosition, selectedSite.latitude, selectedSite.longitude, useTerrain);
+    const sunDirection = skyDirection(sunPosition.azimuth, sunPosition.elevation);
+    const earthDirection = skyDirection(earthPosition.azimuth, earthPosition.elevation);
 
-    const solarPoints = [];
-    for (let offset = -6; offset <= 6; offset += 0.5) {
-      const sample = calculateSunPosition(
-        new Date(time.getTime() + offset * 60 * 60 * 1000),
-        selectedSite.latitude,
-        selectedSite.longitude
-      );
-      solarPoints.push(celestialPosition(sample.azimuth, Math.max(0.12, sample.elevation), 18, 1.1));
-    }
-    const earthPoints = [];
-    for (let offset = -15; offset <= 15; offset += 1) {
-      const sample = calculateEarthPosition(
-        new Date(time.getTime() + offset * 24 * 60 * 60 * 1000),
-        selectedSite.latitude,
-        selectedSite.longitude
-      );
-      earthPoints.push(celestialPosition(sample.azimuth, Math.max(0.12, sample.elevation), 17, 1.1));
-    }
+    // Disc centres sit at the true elevation; the skyline hides whatever is below it.
+    stage.sun.position.copy(skyPoint(sunPosition.azimuth, sunPosition.elevation));
+    stage.earth.group.position.copy(skyPoint(earthPosition.azimuth, earthPosition.elevation));
+    // From high up in Free View you can see past the horizon, so hide bodies that have fully set.
+    stage.sun.visible = viewMode === 'surface' || sunClearance > -0.265 * SUN_EXAGGERATION;
+    stage.earth.group.visible = viewMode === 'surface' || earthClearance > -0.95 * EARTH_EXAGGERATION;
+    stage.earth.material.uniforms.uSunDirection.value.copy(sunDirection);
+    stage.earth.mesh.rotation.y = ((time.getTime() % EARTH_SIDEREAL_DAY_MS) / EARTH_SIDEREAL_DAY_MS) * Math.PI * 2;
 
-    layers.solarTrajectory.visible = showSolarFlux;
-    layers.earthTrajectory.visible = showDTELink;
-    layers.solarTrajectory.geometry.setFromPoints(solarPoints);
-    layers.earthTrajectory.geometry.setFromPoints(earthPoints);
-    layers.solarTrajectory.computeLineDistances();
-    layers.earthTrajectory.computeLineDistances();
-    layers.craterRim.visible = showHorizonMask;
-    layers.azimuthGrid.visible = showGrid;
-    layers.sceneGridLabels.visible = showGrid;
-  }, [
-    time,
-    selectedSite,
-    showSolarFlux,
-    showDTELink,
-    showGrid,
-    showHorizonMask
-  ]);
+    stage.keyLightAzimuth = sunClearance > 0 ? sunPosition.azimuth : earthPosition.azimuth;
+
+    // Sunlight fades in as the real 0.53°-wide disc clears the skyline.
+    const sunFraction = Math.max(0, Math.min(1, (sunClearance + 0.265) / 0.53));
+    stage.sunLight.position.copy(sunDirection.clone().multiplyScalar(420).add(new THREE.Vector3(0, MOUND_HEIGHT, 0)));
+    stage.sunLight.intensity = 34 * sunFraction;
+    stage.sunLight.castShadow = sunFraction > 0;
+    const earthUp = earthClearance > 0;
+    stage.earthLight.position.copy(earthDirection.clone().multiplyScalar(300));
+    stage.earthLight.intensity = earthUp ? 0.5 : 0;
+    stage.workLight.children.forEach((lamp) => { lamp.intensity = 30 * lamp.userData.share * (1 - sunFraction); });
+    stage.stars.material.opacity = 1 - 0.72 * sunFraction;
+
+    // Dish tracks Earth. The link beam shows only while Earth is above the horizon.
+    const earthTarget = skyPoint(earthPosition.azimuth, earthPosition.elevation);
+    stage.dishMount.lookAt(earthTarget);
+    const dishWorld = stage.dishMount.getWorldPosition(new THREE.Vector3());
+    stage.linkBeam.visible = showDTELink && earthUp;
+    if (stage.linkBeam.visible) setFatLinePoints(stage.linkBeam, [dishWorld, earthTarget]);
+
+    // Bright trail = where the body has just been; thin line = its whole lunar-day path.
+    const hourIndex = Math.max(0, Math.min(site.sunSamples.length - 1, Math.round((time.getTime() - windowStart.getTime()) / 3600000)));
+    const trail = (samples, hoursBack, current) => [
+      ...samples.slice(Math.max(0, hourIndex - hoursBack), hourIndex).map((sample) => skyPoint(sample.azimuth, sample.elevation, SKY_RADIUS * 0.988)),
+      skyPoint(current.azimuth, current.elevation, SKY_RADIUS * 0.988)
+    ];
+    stage.sunPath.visible = showSolarFlux;
+    stage.sunTrail.visible = showSolarFlux;
+    stage.earthPath.visible = showDTELink;
+    stage.earthTrail.visible = showDTELink;
+    if (showSolarFlux) setFatLinePoints(stage.sunTrail, trail(site.sunSamples, 72, sunPosition));
+    if (showDTELink) setFatLinePoints(stage.earthTrail, trail(site.earthSamples, 120, earthPosition));
+
+    stage.skyGrid.visible = showGrid;
+    site.surveyGrid.visible = showHorizonMask;
+  }, [time, selectedSite, windowStart, viewMode, useTerrain, showSolarFlux, showDTELink, showGrid, showHorizonMask]);
 
   const sunPosition = calculateSunPosition(time, selectedSite.latitude, selectedSite.longitude);
   const earthPosition = calculateEarthPosition(time, selectedSite.latitude, selectedSite.longitude);
-  const overlaySunPoint = getOverlayOrbitPoint(sunPosition.azimuth, 30);
-  const overlayEarthPoint = getOverlayOrbitPoint(earthPosition.azimuth, 17);
-  const overlaySunTrail = getOverlayTrailPath(sunPosition.azimuth, 30);
-  const overlayEarthTrail = getOverlayTrailPath(earthPosition.azimuth, 17);
-  const aerialLabels = useMemo(() => ([
-    { key: 'north', label: 'N', azimuth: 0, elevation: 10, className: 'cardinal north' },
-    { key: 'east', label: 'E', azimuth: 90, elevation: 10, className: 'cardinal' },
-    { key: 'south', label: 'S', azimuth: 180, elevation: 10, className: 'cardinal' },
-    { key: 'west', label: 'W', azimuth: 270, elevation: 10, className: 'cardinal' },
-    { key: 'site', label: selectedSite.name, azimuth: 180, elevation: 2, className: 'site' },
-    { key: 'rim', label: 'Malapert rim · 2.4 km', azimuth: 180, elevation: 8, className: 'feature' },
-    { key: 'sun', label: `Sun · ${sunPosition.elevation.toFixed(1)}°`, azimuth: sunPosition.azimuth, elevation: Math.max(0, sunPosition.elevation), className: 'sun' },
-    { key: 'earth', label: `Earth · ${earthPosition.elevation.toFixed(1)}°`, azimuth: earthPosition.azimuth, elevation: Math.max(0, earthPosition.elevation), className: 'earth' }
-  ]), [selectedSite, sunPosition.azimuth, sunPosition.elevation, earthPosition.azimuth, earthPosition.elevation]);
+  const sunClearance = clearanceOf(sunPosition, selectedSite.latitude, selectedSite.longitude, useTerrain);
+  const earthClearance = clearanceOf(earthPosition, selectedSite.latitude, selectedSite.longitude, useTerrain);
+  const skylineWord = useTerrain ? 'skyline' : 'horizon';
+  const hoverText = hover && {
+    sun: ['Sun', `Elevation ${formatSigned(sunPosition.elevation)} · azimuth ${sunPosition.azimuth.toFixed(1)}°`, sunClearance > 0 ? `${sunClearance.toFixed(1)}° above the ${skylineWord}: solar power available` : `${Math.abs(sunClearance).toFixed(1)}° below the ${skylineWord}: no solar power`],
+    earth: ['Earth', `Elevation ${formatSigned(earthPosition.elevation)} · azimuth ${earthPosition.azimuth.toFixed(1)}°`, earthClearance > 0 ? `${earthClearance.toFixed(1)}° above the ${skylineWord}: direct radio contact possible` : `${Math.abs(earthClearance).toFixed(1)}° below the ${skylineWord}: no direct radio contact`],
+    lander: ['Lander', `Sensor mast ${MAST_HEIGHT} m above the ground`, 'The dish turns to follow Earth']
+  }[hover.key];
 
-  const openElementPopup = (key, event) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const width = 15 * 16;
-    const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.right + 8));
-    const top = Math.max(8, Math.min(window.innerHeight - 130, rect.top));
-    setPopup({ key, left, top });
-  };
+  // Bird's-eye compass: where the Sun and Earth are around the horizon, and where the camera is looking.
+  const compassPoint = (azimuth, radius) => ({
+    x: 50 + Math.sin(azimuth * DEG) * radius,
+    y: 50 - Math.cos(azimuth * DEG) * radius
+  });
+  const viewAz = cameraInfo?.centerAz ?? 0;
+  const halfFov = ((cameraInfo?.fov ?? 62) * 1.3) / 2;
+  const wedgeStart = compassPoint(viewAz - halfFov, 40);
+  const wedgeEnd = compassPoint(viewAz + halfFov, 40);
+  const sunDot = compassPoint(sunPosition.azimuth, 40);
+  const earthDot = compassPoint(earthPosition.azimuth, 40);
 
   return (
     <div ref={containerRef} className="lunar-scene-3d" aria-label="Interactive 3D lunar horizon">
       {showInterface && (
-        <div className="camera-fps-readout" aria-live="polite">
-          CAMERA FPS {fps || '--'}
-        </div>
-      )}
-      {showInterface && azimuthHost && createPortal((
         <>
-          {!isAzimuthVisible && (
-            <button
-              type="button"
-              className="azimuth-map-launch"
-              onClick={() => setIsAzimuthVisible(true)}
-            >
-              Azimuth Map
-            </button>
-          )}
-          {isAzimuthVisible && (
-            <div
-              ref={azimuthScrollRef}
-              className={`aerial-overlay-shell${isAzimuthFullscreen ? ' is-fullscreen' : ''}`}
-              onScroll={isAzimuthFullscreen ? updateAzimuthScroll : undefined}
-            >
-              <div className="aerial-azimuth-overlay" aria-label="Aerial azimuth and elevation">
-              {isAzimuthFullscreen && <h2 className="azimuth-overlay-heading">South Pole Map = Bird's Eye View</h2>}
-              <div className="azimuth-mock-model" aria-label="Moon-centered azimuth model">
-                <svg className="azimuth-mock-trajectories" viewBox="0 0 100 100" role="img" aria-label="Sun and Earth circular trajectories">
-                  {showSolarFlux && (
-                    <>
-                      <circle className="azimuth-orbit-sun" cx="50" cy="50" r="30" />
-                      <path className="azimuth-trail-sun" d={overlaySunTrail} />
-                    </>
-                  )}
-                  {showDTELink && (
-                    <>
-                      <circle className="azimuth-orbit-earth" cx="50" cy="50" r="17" />
-                      <path className="azimuth-trail-earth" d={overlayEarthTrail} />
-                    </>
-                  )}
-                  <circle className="azimuth-moon" cx="50" cy="50" r="10" />
-                  {showSolarFlux && <circle className="azimuth-point-sun" cx={overlaySunPoint.x} cy={overlaySunPoint.y} r="2.2" />}
-                  {showDTELink && <circle className="azimuth-point-earth" cx={overlayEarthPoint.x} cy={overlayEarthPoint.y} r="2.4" />}
-                </svg>
-                <span className="azimuth-moon-label">MOON POV</span>
+          <div className="camera-fps-readout" aria-live="off">FPS {fps || '--'}</div>
+          {isCompassVisible ? (
+            <div className="sky-compass" aria-label="Bird's-eye compass of Sun and Earth directions">
+              <div className="sky-compass-title">
+                <span>Bird&apos;s-eye compass</span>
+                <button type="button" aria-label="Hide compass" onClick={() => setIsCompassVisible(false)}>×</button>
               </div>
-              {aerialLabels.map((item) => {
-                const left = Math.min(86, Math.max(14, 50 + Math.sin(item.azimuth * DEG_TO_RAD) * 42));
-                const bottom = Math.min(84, Math.max(14, 8 + Math.min(item.elevation, 20) / 20 * 82));
-                const interactive = ['sun', 'earth'].includes(item.key);
-                return (
-                  <button
-                    type="button"
-                    key={item.key}
-                    className={`aerial-label ${item.className}`}
-                    style={{ left: `${left}%`, bottom: `${bottom}%` }}
-                    onClick={interactive ? (event) => openElementPopup(item.key, event) : undefined}
-                    tabIndex={interactive ? 0 : -1}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-              </div>
-              {isAzimuthFullscreen && (
-                <div className={`azimuth-custom-scroll${azimuthScrollVisible ? ' is-visible' : ''}`} aria-label="Azimuth map scroll controls">
-                  <button type="button" aria-label="Scroll azimuth map up" className={azimuthScrollAt.top ? 'is-end' : ''} onClick={() => nudgeAzimuthScroll(-1)}>▲</button>
-                  <span aria-hidden="true" />
-                  <button type="button" aria-label="Scroll azimuth map down" className={azimuthScrollAt.bottom ? 'is-end' : ''} onClick={() => nudgeAzimuthScroll(1)}>▼</button>
-                </div>
-              )}
-              <div className="aerial-overlay-actions">
-                <button type="button" aria-label="Toggle fullscreen azimuth map" onClick={() => setIsAzimuthFullscreen((value) => !value)}>
-                  {isAzimuthFullscreen ? '↙' : '⛶'}
-                </button>
-                <button type="button" aria-label="Close azimuth map" onClick={() => { setIsAzimuthVisible(false); setIsAzimuthFullscreen(false); }}>
-                  ×
-                </button>
-              </div>
+              <svg viewBox="0 0 100 100" role="img" aria-label={`Sun at azimuth ${sunPosition.azimuth.toFixed(0)} degrees, Earth at azimuth ${earthPosition.azimuth.toFixed(0)} degrees`}>
+                <circle className="sky-compass-ring" cx="50" cy="50" r="40" />
+                <path className="sky-compass-view" d={`M 50 50 L ${wedgeStart.x} ${wedgeStart.y} A 40 40 0 0 1 ${wedgeEnd.x} ${wedgeEnd.y} Z`} />
+                {[['N', 0], ['E', 90], ['S', 180], ['W', 270]].map(([label, azimuth]) => {
+                  const point = compassPoint(azimuth, 47);
+                  return <text key={label} className="sky-compass-cardinal" x={point.x} y={point.y + 2.4}>{label}</text>;
+                })}
+                <circle className="sky-compass-lander" cx="50" cy="50" r="2.2" />
+                {showSolarFlux && (
+                  <g className={sunClearance > 0 ? '' : 'is-down'}>
+                    <line className="sky-compass-ray sun" x1="50" y1="50" x2={sunDot.x} y2={sunDot.y} />
+                    <circle className="sky-compass-body sun" cx={sunDot.x} cy={sunDot.y} r="3.4" />
+                  </g>
+                )}
+                {showDTELink && (
+                  <g className={earthClearance > 0 ? '' : 'is-down'}>
+                    <line className="sky-compass-ray earth" x1="50" y1="50" x2={earthDot.x} y2={earthDot.y} />
+                    <circle className="sky-compass-body earth" cx={earthDot.x} cy={earthDot.y} r="3.4" />
+                  </g>
+                )}
+              </svg>
+              <dl className="sky-compass-legend">
+                <div><dt className="sun">Sun</dt><dd>{formatSigned(sunPosition.elevation, 1)} · az {sunPosition.azimuth.toFixed(0)}°</dd></div>
+                <div><dt className="earth">Earth</dt><dd>{formatSigned(earthPosition.elevation, 1)} · az {earthPosition.azimuth.toFixed(0)}°</dd></div>
+                <div><dt className="view">View</dt><dd>looking az {viewAz.toFixed(0)}°</dd></div>
+              </dl>
             </div>
+          ) : (
+            <button type="button" className="sky-compass-launch" onClick={() => setIsCompassVisible(true)}>Compass</button>
           )}
         </>
-      ), azimuthHost)}
-      {popup && azimuthHost && createPortal((
-        <div className="scene-element-popup" role="dialog" aria-label={`${popup.key} details`} style={{ left: `${popup.left}px`, top: `${popup.top}px` }}>
-          <strong>{popup.key === 'sun' ? 'Sun' : popup.key === 'earth' ? 'Earth' : 'Sensor'}</strong>
-          <span>
-            {popup.key === 'sun' && `Solar elevation ${sunPosition.elevation.toFixed(2)}° · azimuth ${sunPosition.azimuth.toFixed(1)}°`}
-            {popup.key === 'earth' && `Earth elevation ${earthPosition.elevation.toFixed(2)}° · azimuth ${earthPosition.azimuth.toFixed(1)}°`}
-          </span>
-          <button type="button" className="popup-close-link" onClick={() => setPopup(null)}>Close</button>
+      )}
+      {hoverText && (
+        <div className="scene-hover-tip" role="tooltip" style={{ left: `${hover.x + 14}px`, top: `${hover.y + 14}px` }}>
+          <strong>{hoverText[0]}</strong>
+          <span>{hoverText[1]}</span>
+          <span>{hoverText[2]}</span>
         </div>
-      ), azimuthHost)}
+      )}
     </div>
   );
 };
