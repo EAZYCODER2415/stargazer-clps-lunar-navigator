@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, RotateCcw, Settings } from 'lucide-react';
-import { calculateEarthPosition, calculateSunPosition } from '../utils/ephemeris';
-
-const landingSites = [
-  { name: 'Shackleton Crater', latitude: -89.9, longitude: 0 },
-  { name: 'Malapert Mountain / Massif', latitude: -85.99, longitude: 2.93 },
-  { name: 'Wiechert Circle', latitude: -87.5, longitude: 0 }
-];
+import { calculateEarthPosition, calculateSunPosition } from '../utils/ephemerisRuntime';
+import landingSites from '../data/landingSites.json';
 
 const Header = ({
   time,
@@ -14,9 +9,13 @@ const Header = ({
   onSiteChange,
   viewMode,
   onViewModeChange,
-  onSettingsClick
+  onSettingsClick,
+  verdict,
+  sunVisibleHours,
+  earthVisibleHours
 }) => {
   const [isSiteMenuOpen, setIsSiteMenuOpen] = useState(false);
+  const [isVerdictOpen, setIsVerdictOpen] = useState(false);
   const sun = calculateSunPosition(time, selectedSite.latitude, selectedSite.longitude);
   const earth = calculateEarthPosition(time, selectedSite.latitude, selectedSite.longitude);
   const utcTime = time.toISOString().replace('T', ' ').replace('Z', ' UTC');
@@ -28,9 +27,16 @@ const Header = ({
 
   return (
     <header className="mission-header">
+      <div className="mission-verdict mission-header-verdict" role="status">
+        <strong>{verdict}</strong>
+        <span>
+          {sunVisibleHours.toFixed(0)} h Sun / {earthVisibleHours.toFixed(0)} h Earth visible in this 29.53-day lunar day
+          {' · '}Celestial disc sizes exaggerated for visibility
+        </span>
+      </div>
       <div className="mission-header-brand">
         <div>
-          <h1>Lunar Mission</h1>
+          <h1>Stargazer</h1>
           <span className="mission-header-subtitle">NASA CLPS · ARTEMIS</span>
         </div>
         <span className="mission-header-badge">CLASS SIM</span>
@@ -45,7 +51,7 @@ const Header = ({
           aria-haspopup="listbox"
         >
           <span>
-            <small>TARGET</small>
+            <small>LANDING SITE</small>
             {selectedSite.name} ({Math.abs(selectedSite.latitude).toFixed(2)}° S, {Math.abs(selectedSite.longitude).toFixed(2)}° E)
           </span>
           <ChevronDown aria-hidden="true" />
@@ -69,6 +75,26 @@ const Header = ({
           </div>
         )}
       </div>
+
+      <button
+        type="button"
+        className="mission-verdict mission-header-verdict"
+        onClick={() => setIsVerdictOpen((isOpen) => !isOpen)}
+        aria-expanded={isVerdictOpen}
+        aria-haspopup="dialog"
+        title="see verdict message"
+      >
+        <strong>🌍 Direct radio contact is {sun.elevation >= 0 && earth.elevation >= 0 ? 'possible' : 'impossible'}</strong>
+      </button>
+      {isVerdictOpen && (
+        <div className="mission-verdict-popup" role="dialog" aria-label="Verdict message">
+          <strong>{verdict}</strong>
+          <span>
+            {sunVisibleHours.toFixed(0)} h Sun / {earthVisibleHours.toFixed(0)} h Earth visible in this 29.53-day lunar day
+            {' · '}Celestial disc sizes exaggerated for visibility
+          </span>
+        </div>
+      )}
 
       <div className="mission-header-telemetry">
         <div className="mission-header-reading mission-header-utc">

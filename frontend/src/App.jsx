@@ -10,24 +10,21 @@ import {
   findNextHorizonTransition,
   getVisibilityBands,
   getVisibilitySummary,
-  createEphemerisTable,
-  isAboveHorizon
-} from './utils/ephemeris';
+  isAboveHorizon,
+  getBestOverlap
+} from './utils/ephemerisRuntime';
 import './styles/horizonTracker.css';
 import ComparisonPanel from './components/ComparisonPanel';
+import landingSites from './data/landingSites.json';
 
 function App() {
-  const initialTime = new Date('2026-10-18T14:19:59Z');
+  const initialTime = new Date('2026-12-01T00:00:00Z');
   const [time, setTime] = useState(initialTime);
   const [windowStart] = useState(initialTime);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeWarp, setTimeWarp] = useState(1); // 1x speed
   const [activeTool, setActiveTool] = useState('view-modes');
-  const [selectedSite, setSelectedSite] = useState({
-    name: 'Malapert Mountain / Massif',
-    latitude: -85.99,
-    longitude: 2.93
-  });
+  const [selectedSite, setSelectedSite] = useState(landingSites[0]);
   const [viewMode, setViewMode] = useState('surface'); // 'surface' or 'free'
   const [cameraPan, setCameraPan] = useState({ yaw: 0, pitch: 0 });
   const [showSolarFlux, setShowSolarFlux] = useState(true);
@@ -66,10 +63,10 @@ function App() {
 
   const handleCameraPan = useCallback((direction, amount = 1) => {
     const increments = {
-      up: { yaw: 0, pitch: -6 },
-      down: { yaw: 0, pitch: 6 },
-      left: { yaw: -8, pitch: 0 },
-      right: { yaw: 8, pitch: 0 }
+      up: { yaw: 0, pitch: 6 },
+      down: { yaw: 0, pitch: -6 },
+      left: { yaw: 8, pitch: 0 },
+      right: { yaw: -8, pitch: 0 }
     };
     const increment = increments[direction];
     if (!increment) return;
@@ -87,8 +84,8 @@ function App() {
       ? calculateSunPosition(time, selectedSite.latitude, selectedSite.longitude)
       : calculateEarthPosition(time, selectedSite.latitude, selectedSite.longitude);
     setCameraPan({
-      yaw: Math.max(-75, Math.min(75, position.azimuth > 180 ? position.azimuth - 360 : position.azimuth)),
-      pitch: Math.max(-35, Math.min(35, -position.elevation))
+      yaw: -(position.azimuth > 180 ? position.azimuth - 360 : position.azimuth),
+      pitch: Math.max(-35, Math.min(35, position.elevation))
     });
   }, [selectedSite, time]);
 
@@ -147,28 +144,19 @@ function App() {
     () => getVisibilityBands(windowStart, calculateEarthPosition, selectedSite.latitude, selectedSite.longitude),
     [windowStart, selectedSite]
   );
-  const sunTable = useMemo(() => createEphemerisTable(windowStart, calculateSunPosition, selectedSite.latitude, selectedSite.longitude), [windowStart, selectedSite]);
-  const earthTable = useMemo(() => createEphemerisTable(windowStart, calculateEarthPosition, selectedSite.latitude, selectedSite.longitude), [windowStart, selectedSite]);
-  const bestWindow = useMemo(() => {
-    let best = null;
-    sunTable.forEach((sample, index) => {
-      const earth = earthTable[index];
-      if (sample.elevation >= 0 && earth.elevation >= 0) {
-        const next = sunTable[index + 1];
-        const hours = next ? (next.time - sample.time) / 3600000 : 0;
-        if (!best || hours > best.hours) best = { time: sample.time, hours };
-      }
-    });
-    return best;
-  }, [sunTable, earthTable]);
+  const bestWindow = useMemo(
+    () => getBestOverlap(selectedSite.latitude, selectedSite.longitude),
+    [selectedSite]
+  );
   const handleJumpTo = (target) => {
     if (target === 'best' && bestWindow) return setTime(bestWindow.time);
     const transition = target === 'sun' ? nextSunTransition : nextEarthTransition;
     if (transition) setTime(transition.time);
   };
-  const verdict = telemetry.isSunVisible
-    ? `Sun is visible. Array power is available. Earth is ${telemetry.isEarthVisible ? 'visible, so direct radio contact is possible.' : 'below the horizon.'}`
-    : `Sun is down. Rises in ${Math.round(nextSunTransition?.hours || 0)} hours. Earth is ${telemetry.isEarthVisible ? 'visible, so direct radio contact is possible.' : 'below the horizon.'}`;
+  const directRadioPossible = telemetry.isSunVisible && telemetry.isEarthVisible;
+  const verdict = directRadioPossible
+    ? 'Sun and Earth are visible. Array power and direct radio contact are available.'
+    : `Direct radio contact is impossible. Sun is ${telemetry.isSunVisible ? 'visible' : `down and rises in ${Math.round(nextSunTransition?.hours || 0)} hours`}; Earth is ${telemetry.isEarthVisible ? 'visible' : 'below the horizon'}.`;
 
   return (
     <div className="app">
@@ -195,26 +183,23 @@ function App() {
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               onSettingsClick={() => setActiveTool('canvas-settings')}
-            />
-            <div className="mission-verdict" role="status">
-              <strong>{verdict}</strong>
-              <span>
-                {sunSummary.visibleHours.toFixed(0)} h Sun / {earthSummary.visibleHours.toFixed(0)} h Earth visible in this 29.53-day lunar day
-                {' · '}Celestial disc sizes exaggerated for visibility
-              </span>
-            </div>
-            <CameraControls
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              onPan={handleCameraPan}
-              onResetPan={resetCameraPan}
-              invertLook={invertLook}
-              onInvertLookChange={setInvertLook}
-              onLookAt={lookAt}
-              sensitivity={cameraSensitivity}
+              verdict={verdict}
+              sunVisibleHours={sunSummary.visibleHours}
+              earthVisibleHours={earthSummary.visibleHours}
             />
           </>
         )}
+        <CameraControls
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onPan={handleCameraPan}
+          onResetPan={resetCameraPan}
+          invertLook={invertLook}
+          onInvertLookChange={setInvertLook}
+          onLookAt={lookAt}
+          sensitivity={cameraSensitivity}
+          isHidden={!showInterface}
+        />
         {/* Right Vertical Tool Dock */}
         <ToolDock
           activeTool={activeTool}

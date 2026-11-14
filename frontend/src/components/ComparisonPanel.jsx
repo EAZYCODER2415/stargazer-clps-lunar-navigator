@@ -1,12 +1,12 @@
-import { calculateEarthPosition, calculateSunPosition, getVisibilitySummary } from '../utils/ephemeris';
+import {
+  calculateEarthPosition,
+  calculateSunPosition,
+  getBestOverlap,
+  getVisibilitySummary
+} from '../utils/ephemerisRuntime';
+import landingSites from '../data/landingSites.json';
 
-const ComparisonPanel = ({ selectedSite, selectedDate, onClose }) => {
-  const sites = [
-    selectedSite,
-    { name: 'Shackleton Crater', latitude: -89.9, longitude: 0 },
-    { name: 'Wiechert Circle', latitude: -87.5, longitude: 0 }
-  ];
-
+const ComparisonPanel = ({ selectedDate, onClose }) => {
   return (
     <aside className="comparison-panel" aria-label="Site comparison">
       <div className="comparison-panel-header">
@@ -18,16 +18,17 @@ const ComparisonPanel = ({ selectedSite, selectedDate, onClose }) => {
       </div>
       <p className="comparison-panel-note">Prototype comparison uses the current simplified ephemeris. LOLA terrain and JPL Horizons data require the backend.</p>
       <div className="comparison-grid">
-        {sites.map((site) => {
+        {landingSites.map((site) => {
           const sun = getVisibilitySummary(selectedDate, calculateSunPosition, site.latitude, site.longitude);
           const earth = getVisibilitySummary(selectedDate, calculateEarthPosition, site.latitude, site.longitude);
+          const bestOverlap = getBestOverlap(site.latitude, site.longitude);
           return (
             <section key={site.name} className="comparison-card">
               <strong>{site.name}</strong>
               <span>{Math.abs(site.latitude).toFixed(2)}° S · {Math.abs(site.longitude).toFixed(2)}° E</span>
               <div><b>{sun.visibleHours.toFixed(0)} h</b> Sun visible</div>
               <div><b>{earth.visibleHours.toFixed(0)} h</b> Earth visible</div>
-              <small>Best overlap: {Math.min(sun.longestWindowHours, earth.longestWindowHours).toFixed(1)} h</small>
+              <small>Best overlap: {bestOverlap?.hours.toFixed(1) || '0.0'} h</small>
             </section>
           );
         })}
