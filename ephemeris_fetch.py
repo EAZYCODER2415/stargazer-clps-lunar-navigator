@@ -1,22 +1,22 @@
-"""Generate the Stargazer Sun/Earth ephemeris data files.
-
-JPL Horizons is the production source for the hourly observer positions written
-to ``./ephemeris/``. The calculation helpers below retain the original
-deterministic model for offline callers and keep that model in the Python
-ephemeris pipeline rather than duplicating it in another backend module.
+"""
+Pull hourly Sun + Earth azimuth/elevation for each landing site from JPL Horizons.
+Output: one JSON per site in ./ephemeris_long/  (this is the "already-calculated" ephemeris Liam means)
+Default: 118.2 days of hourly rows (4 lunar days). The first 709 rows are one lunar day (29.53 days).
 
 Run: pip install requests && python ephemeris_fetch.py
 No API key needed.
+
+Optional: python ephemeris_fetch.py <days> <output_folder>
+  e.g.    python ephemeris_fetch.py 29.53 my_folder   (one lunar day only)
 """
-import json
-import math
-import os
+import json, os, sys, requests
 from datetime import datetime, timedelta
 from pathlib import Path
 
 API = "https://ssd.jpl.nasa.gov/api/horizons.api"
 START = "2026-12-01 00:00"       # change to the scenario start date
-DAYS = 29.53                     # one synodic month = one lunar day
+DAYS = float(sys.argv[1]) if len(sys.argv) > 1 else 118.2   # default: 4 synodic months (4 lunar days)
+OUT_DIR = sys.argv[2] if len(sys.argv) > 2 else "ephemeris_long"
 STEP = "1h"
 
 # Fact-checked 14 Nov 2026 (sources in comments).
@@ -119,14 +119,12 @@ def write_frontend_site_manifest():
 
 
 def main():
-    write_frontend_site_manifest()
-    FRONTEND_EPHEMERIS_DIR.mkdir(parents=True, exist_ok=True)
-    os.makedirs("ephemeris", exist_ok=True)
+    os.makedirs(OUT_DIR, exist_ok=True)
     for site in SITES:
         data = {"site": site, "start": START, "step_h": 1}
         for name, bid in BODIES.items():
             data[name] = fetch(bid, site)
-        path = f"ephemeris/{site['id']}.json"
+        path = f"{OUT_DIR}/{site['id']}.json"
         with open(path, "w") as f:
             json.dump(data, f)
         with (FRONTEND_EPHEMERIS_DIR / f"{site['id']}.json").open("w", encoding="utf-8") as output:
