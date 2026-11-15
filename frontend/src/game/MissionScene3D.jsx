@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { PROPELLANT_LOAD_SECONDS } from './gameEngine';
+import { LANDER_START_X, LANDING_ZONE_X, PROPELLANT_LOAD_SECONDS } from './gameEngine';
 import { grainCanvas, layeredNoise } from './planetTextures';
 import { PART_SIZE, SLOT_OF, SLOT_RANGE, STACK_BASE, STACK_ORDER, STACK_TOP, addStars, box, cylinder, makeEarth, makeFairingHalf, makeGhost, makeGlowTexture, makeLabel, makeMoon, makePart, makePlume, material, partSlots } from './sceneKit';
 
@@ -499,12 +499,14 @@ function addAscent(scene) {
     clouds.add(cloud);
   }
 
-  // Earth's curved horizon, which comes into view as the sky darkens.
-  const earth = makeEarth(scene, 42, 512, true);
+  // Earth's curved horizon, which fades in below the vehicle as the sky darkens.
+  const EARTH_RADIUS = 42;
+  const earth = makeEarth(scene, EARTH_RADIUS, 512, true);
   // Turned so the camera looks across the equator, not down onto a pole.
   earth.group.rotation.set(Math.PI / 2, 0, 0);
   earth.group.position.set(0, -80, -25);
   earth.group.visible = false;
+  earth.globe.material.transparent = true;
 
   // The vehicle, built from the same parts as the assembly stage.
   const centre = (STACK_BASE + STACK_TOP) / 2;
@@ -544,8 +546,18 @@ function addAscent(scene) {
       const haze = 1 - smooth(34, 50, t);
       clouds.children.forEach((cloud) => { cloud.material.opacity = cloud.userData.opacity * haze; });
       clouds.visible = haze > 0.01;
-      earth.group.visible = t > 36;
-      earth.group.position.y = lerp(-80, -44.6, smooth(36, 88, t));
+      // Earth fades in through the thinning haze, then its horizon sinks and curves away as
+      // the vehicle climbs. It must never move up the screen: ground rising towards the
+      // vehicle reads as the vehicle falling back.
+      const reveal = smooth(36, 54, t);
+      const climb = smooth(36, 115, t);
+      const earthScale = lerp(1.15, 1, climb);
+      earth.group.visible = reveal > 0;
+      earth.group.scale.setScalar(earthScale);
+      earth.group.position.y = lerp(1.2, -4.6, climb) - EARTH_RADIUS * earthScale;
+      earth.globe.material.opacity = reveal;
+      earth.cloudLayer.material.opacity = reveal;
+      earth.haze.material.uniforms.uOpacity.value = reveal;
       earth.globe.rotation.y += dt * 0.01;
       earth.cloudLayer.rotation.y += dt * 0.014;
 
@@ -624,8 +636,8 @@ function addTransit(scene) {
 function addLandingScene(scene) {
   addStars(scene);
   const ZONE_Z = -0.5;
-  const ZONE_X = { A: -5, B: 0, C: 5 };
-  const START_X = -2.5;
+  const ZONE_X = LANDING_ZONE_X;
+  const START_X = LANDER_START_X;
   const HOVER = 9.2;
   const SCALE = 1.3;
   const craters = [[-10, -8, 3, 0.9], [9, -10, 2.4, 0.7], [12.5, 5, 1.9, 0.5], [-13, 6, 2.6, 0.7], [-2, -16, 3.4, 0.9], [3.5, 10, 1.5, 0.35]];
@@ -723,10 +735,10 @@ function addLandingScene(scene) {
       const start = landing.descentStartedAt;
       const descending = start !== null && start !== undefined;
       const progress = descending ? clamp((current.elapsed - start) / 90, 0, 1) : 0;
-      // Alignment is what moves the lander over the chosen zone.
-      const aimX = landing.alignmentComplete && ZONE_X[landing.zone] !== undefined ? ZONE_X[landing.zone] : START_X;
+      // The lander sits wherever the player has steered it (A and D), nudges included.
+      const aimX = descending && Number.isFinite(landing.x) ? landing.x : START_X;
       const previousX = lander.position.x;
-      lander.position.x = damp(previousX, aimX, 1.1, dt);
+      lander.position.x = damp(previousX, aimX, 9, dt);
       const ground = heightAt(lander.position.x, ZONE_Z) + 0.5 * SCALE;
       const aimY = landing.touchdown ? ground : HOVER - (HOVER - ground) * (1 - (1 - progress) ** 1.6);
       lander.position.y = damp(lander.position.y, aimY, 3.5, dt);

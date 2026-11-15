@@ -1,5 +1,6 @@
 import { lazy, Suspense, useSyncExternalStore } from 'react';
 import HomePage from './home/HomePage.jsx';
+import LoadingScreen from './LoadingScreen.jsx';
 import { parseHash } from './routes.js';
 
 // The home page is small, so it ships with the first download. The 3D app and the game are
@@ -25,7 +26,7 @@ function Root() {
   if (!isGame && atHome) return <HomePage />;
   const Page = isGame ? GamePage : App;
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<LoadingScreen />}>
       <Page />
     </Suspense>
   );

@@ -265,12 +265,22 @@ test('ascent cues lead to persisted transit questions, landing, and a completed 
   assert.equal(state.phase, 'landing');
   state = send(state, 'SELECT_LANDING_ZONE', { zone: 'B' });
   state = send(state, 'BEGIN_DESCENT');
-  state = tick(state, 20);
-  state = send(state, 'ADJUST_THRUST');
-  state = tick(state, 28);
-  state = send(state, 'ALIGN_LANDER');
-  state = tick(state, 42);
+  // Left alone, the unannounced nudges carry the lander off the zone: a rough landing.
+  const unsteered = send(tick(send(tick(state, 20), 'ADJUST_THRUST'), 70), 'CONFIRM_TOUCHDOWN', { siteName: 'Malapert' });
+  assert.ok(Math.abs(unsteered.landing.x) > 0.8);
+  assert.equal(unsteered.landing.result, 'rough');
+  assert.equal(unsteered.landing.alignmentComplete, false);
+  // Steered with A and D towards zone B and held there against the nudges: nominal.
+  for (let i = 0; i < 180; i += 1) {
+    if (i === 40) state = send(state, 'ADJUST_THRUST');
+    state = send(state, 'SET_LANDER_STEER', { direction: state.landing.x < -0.1 ? 1 : state.landing.x > 0.1 ? -1 : 0 });
+    state = tick(state, 0.5);
+  }
+  assert.ok(Math.abs(state.landing.x) <= 0.8);
+  const frozen = state.landing.x;
+  assert.equal(tick(send(state, 'SET_LANDER_STEER', { direction: 1 }), 5).landing.x, frozen);
   state = send(state, 'CONFIRM_TOUCHDOWN', { siteName: 'Malapert' });
+  assert.equal(state.landing.alignmentComplete, true);
   assert.equal(state.phase, 'lunar-operations');
   assert.equal(state.landing.result, 'nominal');
   state = send(state, 'DEPLOY_ROVER', { siteName: 'Malapert' });
