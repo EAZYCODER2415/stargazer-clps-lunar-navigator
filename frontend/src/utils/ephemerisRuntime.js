@@ -1,10 +1,10 @@
-import malapert from '../data/ephemeris/malapert.json';
-import monsMouton from '../data/ephemeris/mons-mouton.json';
-import shackleton from '../data/ephemeris/shackleton.json';
+import malapert from '../data/ephemeris/malapert.json' with { type: 'json' };
+import monsMouton from '../data/ephemeris/mons-mouton.json' with { type: 'json' };
+import shackleton from '../data/ephemeris/shackleton.json' with { type: 'json' };
 // Real skylines from NASA LOLA elevation data (written by lola_terrain.py)
-import malapertHorizon from '../data/horizon/malapert.json';
-import monsMoutonHorizon from '../data/horizon/mons-mouton.json';
-import shackletonHorizon from '../data/horizon/shackleton.json';
+import malapertHorizon from '../data/horizon/malapert.json' with { type: 'json' };
+import monsMoutonHorizon from '../data/horizon/mons-mouton.json' with { type: 'json' };
+import shackletonHorizon from '../data/horizon/shackleton.json' with { type: 'json' };
 
 const HORIZONS = { malapert: malapertHorizon, 'mons-mouton': monsMoutonHorizon, shackleton: shackletonHorizon };
 const FLAT_MASK = new Array(360).fill(0);
@@ -48,7 +48,14 @@ function interpolate(samples, time) {
   if (timestamp <= samples[0].time.getTime()) return samples[0];
   if (timestamp >= samples[samples.length - 1].time.getTime()) return samples[samples.length - 1];
 
-  const upperIndex = samples.findIndex((sample) => sample.time.getTime() >= timestamp);
+  let low = 1;
+  let high = samples.length - 1;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (samples[middle].time.getTime() < timestamp) low = middle + 1;
+    else high = middle;
+  }
+  const upperIndex = low;
   const lower = samples[upperIndex - 1];
   const upper = samples[upperIndex];
   const ratio = (timestamp - lower.time.getTime()) / (upper.time.getTime() - lower.time.getTime());
@@ -61,6 +68,13 @@ function interpolate(samples, time) {
 const calculatePosition = (body, time, latitude, longitude) => (
   interpolate(findSite(latitude, longitude)[body], time)
 );
+
+export const getEphemerisRange = (latitude, longitude) => {
+  const site = findSite(latitude, longitude);
+  const start = site.sun[0].time;
+  const end = site.sun[site.sun.length - 1].time;
+  return { start: new Date(start), end: new Date(end), sampleCount: site.sun.length, sampleIntervalMs: site.sun[1].time - start };
+};
 
 export const getBestOverlap = (latitude, longitude) => {
   const overlap = findSite(latitude, longitude).best_overlap;
@@ -107,6 +121,70 @@ export const horizonAt = (latitude, longitude, azimuth, terrain = true) => {
 export const clearanceOf = (position, latitude, longitude, terrain = true) => (
   position.elevation - horizonAt(latitude, longitude, position.azimuth, terrain)
 );
+
+export const getLunarSiteConditions = (time, latitude, longitude) => {
+  const sun = calculateSunPosition(time, latitude, longitude);
+  const earth = calculateEarthPosition(time, latitude, longitude);
+  const sunClearance = clearanceOf(sun, latitude, longitude);
+  const earthClearance = clearanceOf(earth, latitude, longitude);
+  return {
+    sun,
+    earth,
+    sunClearance,
+    earthClearance,
+    sunVisible: sunClearance > 0,
+    earthVisible: earthClearance > 0,
+    operatingWindow: sunClearance > 0 && earthClearance > 0
+  };
+};
+
+/**
+ * Finds simultaneous terrain-horizon visibility intervals over the bundled data range.
+ * The ephemeris inputs are hourly; returned crossings are refined against their linear
+ * interpolation and the LOLA-derived skyline mask, not represented as mission-grade times.
+ */
+export const findJointVisibilityWindows = (latitude, longitude, { stepMs = 10 * 60 * 1000, toleranceMs = 60 * 1000 } = {}) => {
+  const { start, end } = getEphemerisRange(latitude, longitude);
+  const startMs = start.getTime();
+  const endMs = end.getTime();
+  const visibleAt = (timestamp) => getLunarSiteConditions(new Date(timestamp), latitude, longitude).operatingWindow;
+  const refine = (lowStart, highStart, lowVisible) => {
+    let low = lowStart;
+    let high = highStart;
+    while (high - low > toleranceMs) {
+      const middle = Math.floor((low + high) / 2);
+      if (visibleAt(middle) === lowVisible) low = middle;
+      else high = middle;
+    }
+    return Math.round((low + high) / 2);
+  };
+
+  const windows = [];
+  let previousTime = startMs;
+  let previousVisible = visibleAt(previousTime);
+  let windowStart = previousVisible ? startMs : null;
+  while (previousTime < endMs) {
+    const time = Math.min(endMs, previousTime + stepMs);
+    const visible = visibleAt(time);
+    if (visible !== previousVisible) {
+      const boundary = refine(previousTime, time, previousVisible);
+      if (visible) windowStart = boundary;
+      else if (windowStart !== null) {
+        windows.push({ start: new Date(windowStart), end: new Date(boundary) });
+        windowStart = null;
+      }
+    }
+    previousTime = time;
+    previousVisible = visible;
+  }
+  if (windowStart !== null) windows.push({ start: new Date(windowStart), end });
+  return windows.map((window) => ({
+    ...window,
+    durationMs: window.end.getTime() - window.start.getTime(),
+    startConditions: getLunarSiteConditions(window.start, latitude, longitude),
+    endConditions: getLunarSiteConditions(window.end, latitude, longitude)
+  }));
+};
 
 /** Hourly az/el samples for one body over the lunar day (used to draw sky paths). */
 export const getSkyPath = (startTime, positionCalculator, latitude, longitude) => (

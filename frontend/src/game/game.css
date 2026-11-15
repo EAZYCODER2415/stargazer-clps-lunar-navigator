@@ -1,194 +1,119 @@
-.game-page {
-  --bg: #0a0a0a;
-  --deep: #050505;
-  --panel: #111111;
-  --secondary: #1a1a2e;
-  --border: #2a2a3a;
-  --text: #e0e0ff;
-  --muted: #a0a0c0;
-  --cyan: #4cc9f0;
-  --cyan-hover: #66d9ff;
-  --sun: #fbbf24;
-  --earth: #66b2ff;
-  min-height: 100vh;
-  padding: 14px clamp(12px, 2vw, 26px) 22px;
-  color: var(--text);
-  background: var(--bg);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  line-height: 1.45;
+.lunar-game {
+  --game-bg: #090b12; --game-panel: #111521; --game-panel-raised: #171d2b; --game-border: #293247;
+  --game-text: #eef3fa; --game-muted: #a8b2c4; --game-dim: #737f93; --game-cyan: #4cc9f0;
+  --game-blue: #66b2ff; --game-gold: #fbbf24; --game-green: #6ee7b7; --game-red: #fb7185;
+  min-height: 100vh; padding: 20px clamp(16px, 3vw, 48px) 36px; color: var(--game-text); background: var(--game-bg);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+.lunar-game * { box-sizing: border-box; }
+.lunar-game button, .lunar-game select { font: inherit; }
+.lunar-game .mission-topbar { display:flex; justify-content:space-between; align-items:center; gap:24px; max-width:1440px; margin:0 auto 20px; padding:10px 0 18px; border-bottom:1px solid var(--game-border); }
+.lunar-game .mission-brand { display:flex; align-items:center; gap:14px; min-width:260px; color:inherit; text-decoration:none; }
+.lunar-game .mission-brand img { width:42px; height:42px; }
+.lunar-game .mission-brand span, .lunar-game .eyebrow, .lunar-game .panel-step { display:block; color:var(--game-cyan); font-size:10px; font-weight:750; letter-spacing:.13em; text-transform:uppercase; }
+.lunar-game .mission-brand h1 { margin:4px 0 0; font-size:16px; letter-spacing:.04em; }
+.lunar-game .mission-brand h1 i { color:var(--game-muted); font-style:normal; font-weight:500; }
+.lunar-game .clock-console { display:flex; align-items:center; justify-content:flex-end; gap:18px; }
+.lunar-game .clock-console > div:first-child { display:grid; gap:3px; }
+.lunar-game .clock-console small, .lunar-game .flight-readouts small { color:var(--game-muted); font-size:9px; letter-spacing:.1em; }
+.lunar-game .clock-console strong { color:var(--game-cyan); font-family:ui-monospace, SFMono-Regular, Consolas, monospace; font-size:20px; }
+.lunar-game .clock-controls { display:flex; align-items:center; gap:8px; }
+.lunar-game .clock-controls label, .lunar-game .site-picker { display:grid; gap:4px; color:var(--game-muted); font-size:10px; letter-spacing:.08em; text-transform:uppercase; }
+.lunar-game select { min-height:36px; padding:6px 10px; border:1px solid var(--game-border); border-radius:4px; color:var(--game-text); background:#0d111b; }
+.lunar-game .game-panel { max-width:1440px; margin:0 auto 16px; border:1px solid var(--game-border); border-radius:7px; background:var(--game-panel); }
+.lunar-game .game-button { min-height:36px; padding:8px 12px; border:1px solid #354058; border-radius:4px; background:#1a2232; color:var(--game-text); font-size:12px; font-weight:650; cursor:pointer; transition:background .15s ease,border-color .15s ease,transform .15s ease; }
+.lunar-game .game-button:hover:not(:disabled) { border-color:var(--game-cyan); background:#202d40; }
+.lunar-game .game-button:focus-visible, .lunar-game button:focus-visible, .lunar-game select:focus-visible { outline:2px solid var(--game-cyan); outline-offset:2px; }
+.lunar-game .game-button:disabled { opacity:.45; cursor:not-allowed; }
+.lunar-game .game-button.selected, .lunar-game .primary-action { border-color:var(--game-cyan); background:#123142; color:#dff8ff; }
+.lunar-game .mission-timeline { padding:13px 16px; }
+.lunar-game .timeline-title { display:flex; justify-content:space-between; gap:12px; margin-bottom:10px; color:var(--game-dim); font-size:10px; }
+.lunar-game .window-track { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.lunar-game .window-card { padding:10px 12px; border:1px solid var(--game-border); border-radius:5px; background:#0c1019; }
+.lunar-game .window-card > div { display:flex; justify-content:space-between; gap:10px; }
+.lunar-game .window-card b { font-size:12px; }
+.lunar-game .window-card > div span { color:var(--game-dim); font-size:9px; font-weight:750; letter-spacing:.08em; }
+.lunar-game .window-card p { margin:7px 0 5px; color:var(--game-muted); font-size:11px; }
+.lunar-game .window-card small { color:var(--game-dim); font-size:10px; }
+.lunar-game .window-card.active { border-color:var(--game-cyan); box-shadow:inset 3px 0 var(--game-cyan); }
+.lunar-game .window-card.active > div span { color:var(--game-cyan); }
+.lunar-game .window-card.missed, .lunar-game .window-card.skipped, .lunar-game .window-card.closed { opacity:.55; }
+.lunar-game .window-note { margin:9px 0 0; color:var(--game-muted); font-size:11px; }
+.lunar-game .text-button { margin-top:7px; min-height:28px; padding:4px 8px; font-size:10px; }
+.lunar-game .phase-heading { max-width:1440px; margin:26px auto 14px; display:flex; justify-content:space-between; align-items:end; gap:18px; }
+.lunar-game .phase-heading h2 { margin:5px 0 3px; font-size:24px; letter-spacing:-.025em; }
+.lunar-game .phase-heading p { margin:0; color:var(--game-muted); font-size:13px; }
+.lunar-game .site-picker { min-width:190px; }
+.lunar-game .phase-panel { padding:clamp(18px,2.4vw,32px); }
+.lunar-game .phase-copy { max-width:760px; margin-bottom:22px; }
+.lunar-game .phase-copy h2, .lunar-game .phase-panel > h2 { margin:6px 0 7px; font-size:22px; }
+.lunar-game .phase-copy p, .lunar-game .phase-panel > p { max-width:800px; margin:0; color:var(--game-muted); font-size:13px; line-height:1.6; }
+.lunar-game .assembly-layout { display:grid; grid-template-columns:minmax(240px, .8fr) minmax(380px, 1.2fr); gap:clamp(20px,5vw,70px); align-items:start; }
+.lunar-game .rocket-stack { display:flex; flex-direction:column; align-items:center; min-height:430px; padding:16px 12px 0; position:relative; }
+.lunar-game .rocket-stack::after { content:""; position:absolute; width:80%; height:1px; bottom:22px; background:#38445b; box-shadow:0 6px 0 #1e2635; }
+.lunar-game .rocket-slot { width:min(100%,330px); min-height:44px; display:flex; justify-content:center; align-items:center; gap:8px; border:1px dashed #47536a; border-bottom:0; color:var(--game-dim); background:#0c111b; cursor:pointer; font-size:9px; letter-spacing:.07em; }
+.lunar-game .rocket-slot:first-child { border-radius:45% 45% 0 0; width:min(75%,250px); }
+.lunar-game .rocket-slot:last-child { width:min(88%,285px); min-height:40px; border-bottom:3px solid #47536a; border-radius:0 0 10px 10px; }
+.lunar-game .rocket-slot.installed { color:var(--game-text); border-style:solid; border-color:#344158; background:#151c2a; font-size:11px; letter-spacing:0; }
+.lunar-game .rocket-slot i, .lunar-game .part-card i { width:9px; height:9px; display:inline-block; border-radius:50%; box-shadow:0 0 10px currentColor; }
+.lunar-game .parts-panel { padding:16px; border:1px solid var(--game-border); border-radius:6px; background:#0d111b; }
+.lunar-game .parts-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:12px; }
+.lunar-game .part-card { min-height:82px; padding:10px; border:1px solid #303a4e; border-radius:5px; text-align:left; color:var(--game-text); background:#141a27; cursor:grab; }
+.lunar-game .part-card b { display:flex; align-items:center; gap:7px; font-size:11px; }
+.lunar-game .part-card small { display:block; margin:7px 0 0; color:var(--game-muted); font-size:10px; line-height:1.4; }
+.lunar-game .part-card.selected { border-color:var(--game-cyan); }
+.lunar-game .part-card.done { opacity:.42; cursor:default; }
+.lunar-game .phase-action { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:20px; padding-top:18px; border-top:1px solid var(--game-border); }
+.lunar-game .phase-action p { color:var(--game-green); font-size:13px; }
+.lunar-game .pad-illustration { position:relative; height:155px; margin:0 0 20px; overflow:hidden; border:1px solid #252e40; border-radius:5px; background:linear-gradient(180deg,#0b1420,#151b27 72%,#1b2230 72%); }
+.lunar-game .pad-ground { position:absolute; inset:auto 0 0; height:28%; border-top:2px solid #384154; background:repeating-linear-gradient(135deg,#252d3b,#252d3b 12px,#202735 12px,#202735 24px); }
+.lunar-game .pad-tower { position:absolute; z-index:1; left:43%; bottom:28%; height:100px; width:36px; border:2px solid #66748b; border-bottom:0; background:repeating-linear-gradient(0deg,transparent,transparent 18px,#58657a 19px,#58657a 21px); }
+.lunar-game .pad-tower i { position:absolute; right:-26px; width:26px; border-top:2px solid #65738a; }
+.lunar-game .pad-tower i:nth-child(1) { top:23px; }.lunar-game .pad-tower i:nth-child(2) { top:48px; }.lunar-game .pad-tower i:nth-child(3) { top:73px; }
+.lunar-game .pad-rocket { position:absolute; z-index:2; left:51%; bottom:28%; transform:translateX(-50%); width:38px; height:112px; display:flex; flex-direction:column; align-items:center; transition:transform .2s; }
+.lunar-game .pad-rocket.clear { transform:translate(-50%,-12px); }
+.lunar-game .rocket-tip { border-left:16px solid transparent; border-right:16px solid transparent; border-bottom:22px solid #dce6f2; }
+.lunar-game .rocket-body { width:31px; height:76px; border:1px solid #8c9ab0; background:linear-gradient(90deg,#566277,#d2dce8 50%,#6f7b8e); }
+.lunar-game .rocket-engine { width:15px; height:14px; background:#e87943; clip-path:polygon(15% 0,85% 0,100% 100%,0 100%); }
+.lunar-game .pad-platform { position:absolute; z-index:3; left:47%; bottom:39%; width:0; height:4px; background:var(--game-gold); transition:width .3s; }.lunar-game .pad-platform.extended { width:14%; }
+.lunar-game .pad-columns { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr); gap:20px; }
+.lunar-game .pad-checklist, .lunar-game .window-review { padding:16px; border:1px solid var(--game-border); border-radius:6px; background:#0e131e; }
+.lunar-game .procedure-row { display:grid; grid-template-columns:28px minmax(120px,1fr) auto; align-items:center; gap:8px; padding:11px 0; border-bottom:1px solid #222b3b; }
+.lunar-game .procedure-row:last-child { border-bottom:0; }.lunar-game .procedure-row > b { color:var(--game-cyan); font:12px ui-monospace,monospace; }.lunar-game .procedure-row > span { color:var(--game-muted); font-size:11px; }
+.lunar-game .inline-actions, .lunar-game .action-row { display:flex; flex-wrap:wrap; gap:7px; }
+.lunar-game .window-review h3 { margin:8px 0 5px; font-size:16px; }.lunar-game .window-review > p { color:var(--game-muted); font-size:11px; line-height:1.5; }
+.lunar-game .weather-meter { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:15px 0 10px; padding:10px; border:1px solid var(--game-border); border-radius:4px; background:#121a27; }.lunar-game .weather-meter span { color:var(--game-dim); font-size:9px; }.lunar-game .weather-meter b { font-size:10px; }.lunar-game .weather-meter i { width:8px; height:8px; border-radius:50%; background:var(--game-green); box-shadow:0 0 10px var(--game-green); }.lunar-game .weather-meter i.caution { background:var(--game-gold); box-shadow:0 0 10px var(--game-gold); }
+.lunar-game .weather-choice { margin-bottom:10px; }.lunar-game .go-lights { display:grid; gap:6px; margin:17px 0; }.lunar-game .go-lights > div { display:grid; grid-template-columns:10px 1fr auto; align-items:center; gap:8px; padding:8px; background:#151b27; }.lunar-game .go-lights i { width:8px; height:8px; border-radius:50%; background:#445064; }.lunar-game .go-lights i.on { background:var(--game-green); box-shadow:0 0 8px var(--game-green); }.lunar-game .go-lights b, .lunar-game .go-lights span { font-size:10px; }.lunar-game .go-lights span { color:var(--game-muted); }
+.lunar-game .primary-action { min-height:43px; padding:10px 16px; font-size:13px; }.lunar-game .window-review > .primary-action { width:100%; }
+.lunar-game .feedback { margin:10px 0; padding:10px 12px; border-left:2px solid var(--game-cyan); color:#c8d5e6; background:#101e2b; font-size:11px; line-height:1.5; }
+.lunar-game .progress-wrap, .lunar-game .descent-meter { margin:18px 0; }.lunar-game .progress-wrap > div, .lunar-game .descent-meter > div { display:flex; justify-content:space-between; margin-bottom:7px; color:var(--game-muted); font-size:10px; }.lunar-game progress { width:100%; height:7px; accent-color:var(--game-cyan); }
+.lunar-game .countdown-phase { max-width:950px; padding:clamp(28px,7vw,80px); text-align:center; }.lunar-game .countdown-phase > p { margin:10px auto 22px; }.lunar-game .countdown-number { margin:20px 0; color:var(--game-cyan); font:clamp(62px,12vw,128px)/1 ui-monospace,monospace; letter-spacing:-.08em; }.lunar-game .countdown-track { height:6px; max-width:560px; margin:0 auto 24px; background:#293244; }.lunar-game .countdown-track i { display:block; height:100%; background:var(--game-cyan); }
+.lunar-game .flight-schematic { display:grid; grid-template-columns:100px 100px 1fr; gap:20px; align-items:center; min-height:300px; margin:22px 0; padding:20px; border:1px solid var(--game-border); background:radial-gradient(ellipse at 52% 80%,#192536,#0b1019 65%); }.lunar-game .flight-line { position:relative; width:2px; height:235px; justify-self:center; background:linear-gradient(#192431,#3c6576); }.lunar-game .flight-line i { position:absolute; left:-4px; width:10px; height:10px; border-radius:50%; background:var(--game-cyan); box-shadow:0 0 15px var(--game-cyan); }.lunar-game .ascent-rocket { display:flex; flex-direction:column; align-items:center; }.lunar-game .ascent-rocket span { width:0; height:0; border-left:18px solid transparent; border-right:18px solid transparent; border-bottom:23px solid #dae2ed; }.lunar-game .ascent-rocket i { width:35px; height:100px; background:linear-gradient(90deg,#536077,#cbd5e1 50%,#627087); }.lunar-game .ascent-rocket b { width:21px; height:20px; background:#e87943; clip-path:polygon(15% 0,85% 0,100% 100%,0 100%); }.lunar-game .flight-readouts { display:grid; gap:10px; }.lunar-game .flight-readouts > div, .lunar-game .transit-data > div { display:grid; gap:5px; padding:12px; border:1px solid var(--game-border); background:#101622; }.lunar-game .flight-readouts b, .lunar-game .transit-data b { font-size:12px; }.lunar-game .phase-explainer, .lunar-game .transit-monitor > p { margin:10px 0 18px; color:var(--game-muted); font-size:11px; }
+.lunar-game .tab-row { display:flex; gap:8px; margin:20px 0; }.lunar-game .transit-monitor, .lunar-game .comms-list { padding:16px; border:1px solid var(--game-border); border-radius:5px; background:#0d121c; }.lunar-game .earth-moon { position:relative; display:flex; justify-content:space-between; align-items:center; height:135px; padding:0 20px; border-bottom:1px solid #364257; color:var(--game-muted); font-size:11px; }.lunar-game .earth-moon::before { content:""; position:absolute; left:30px; right:30px; top:50%; border-top:1px dashed #42506a; }.lunar-game .earth-moon span, .lunar-game .earth-moon b { position:relative; z-index:1; padding:10px; border-radius:50%; background:#111a29; }.lunar-game .earth-moon span { color:var(--game-blue); }.lunar-game .earth-moon b { color:var(--game-muted); }.lunar-game .earth-moon i { position:absolute; z-index:2; top:45%; color:var(--game-cyan); font-size:22px; font-style:normal; transform:translateX(-50%); }.lunar-game .transit-data { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:15px; }
+.lunar-game .comms-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }.lunar-game .comms-question { padding:14px; border:1px solid var(--game-border); border-radius:4px; background:#121825; }.lunar-game .comms-question h3 { font-size:14px; line-height:1.4; }.lunar-game .comms-question p { color:var(--game-muted); font-size:11px; line-height:1.5; }.lunar-game .answer-list { display:grid; gap:8px; margin:10px 0; }.lunar-game .answer-list label { display:flex; gap:8px; align-items:flex-start; color:#d4dce8; font-size:11px; }.lunar-game .answer-list input { accent-color:var(--game-cyan); }
+.lunar-game .landing-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:20px 0; }.lunar-game .zone-card { min-height:120px; display:grid; align-content:space-between; text-align:left; padding:14px; border:1px solid var(--game-border); border-radius:5px; color:var(--game-text); background:radial-gradient(ellipse at 40% 10%,#45505c,#262c34 70%,#191f28); cursor:pointer; }.lunar-game .zone-card span { color:#e0cdb3; font-size:11px; }.lunar-game .zone-card.selected { border-color:var(--game-cyan); box-shadow:inset 0 -3px var(--game-cyan); }.lunar-game .zone-card:disabled { opacity:.7; }.lunar-game .zone-B { background:radial-gradient(ellipse at 40% 10%,#77796d,#46473e 70%,#272923); }.lunar-game .zone-C { background:radial-gradient(ellipse at 40% 10%,#665c58,#373133 70%,#221e22); }
+.lunar-game .lunar-phase .science-caveat { max-width:1000px; padding:12px; border-left:2px solid var(--game-blue); background:#101a28; }.lunar-game .science-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:20px 0 8px; }.lunar-game .science-grid article { display:grid; gap:8px; padding:16px; border:1px solid var(--game-border); border-radius:5px; background:#0d121c; }.lunar-game .science-grid article > b { font-size:14px; }.lunar-game .science-grid small { color:var(--game-muted); font-size:11px; }.lunar-game .sun-color { color:var(--game-gold); }.lunar-game .earth-color { color:var(--game-blue); }.lunar-game .sim-time { display:block; margin:10px 0 18px; color:var(--game-dim); font:10px ui-monospace,monospace; }
+.lunar-game .lunar-scene-frame { position:relative; height:clamp(280px,42vw,540px); margin:20px 0; overflow:hidden; border:1px solid var(--game-border); border-radius:5px; background:#000004; }.lunar-game .lunar-scene-frame .lunar-scene-3d { position:absolute; inset:0; }.lunar-game .scene-caption { position:absolute; left:10px; bottom:10px; padding:6px 8px; border:1px solid #344056; border-radius:3px; color:#d0d9e7; background:#090d16dd; font-size:10px; pointer-events:none; }.lunar-game .scene-loading { display:grid; height:100%; place-items:center; color:var(--game-muted); font-size:12px; }
+.lunar-game .mission-complete { margin-top:20px; padding:22px; border:1px solid #2c6459; border-radius:5px; background:#10211e; }.lunar-game .mission-complete h3 { margin:8px 0; }.lunar-game .mission-complete p { color:var(--game-muted); font-size:12px; }.lunar-game .mission-complete .eyebrow { color:var(--game-green); }
+.lunar-game .activity-panel { padding:16px 20px; }.lunar-game .activity-heading { display:flex; justify-content:space-between; border-bottom:1px solid var(--game-border); padding-bottom:10px; }.lunar-game .activity-heading b { color:var(--game-dim); font-size:10px; }.lunar-game .activity-feed { max-height:250px; overflow:auto; }.lunar-game .activity-feed article { display:grid; grid-template-columns:84px 1fr; gap:12px; padding:10px 0; border-bottom:1px solid #222a39; }.lunar-game .activity-feed time { color:var(--game-cyan); font:10px ui-monospace,monospace; }.lunar-game .activity-feed b { font-size:11px; }.lunar-game .activity-feed p { margin:4px 0 0; color:var(--game-muted); font-size:10px; line-height:1.5; }
+.lunar-game .game-footer { max-width:1440px; margin:18px auto 0; color:var(--game-dim); font-size:10px; line-height:1.6; }
+.lunar-game .guide-backdrop { position:fixed; z-index:1000; inset:0; display:grid; place-items:center; padding:20px; background:rgba(3,6,12,.86); backdrop-filter:blur(8px); }
+.lunar-game .guide-dialog { width:min(680px,100%); max-height:90vh; overflow:auto; padding:clamp(22px,5vw,42px); border:1px solid #35425a; border-radius:8px; background:#101622; box-shadow:0 25px 100px #000b; }
+.lunar-game .guide-dialog h2 { margin:8px 0 10px; font-size:clamp(24px,4vw,34px); line-height:1.15; }.lunar-game .guide-dialog p,.lunar-game .guide-dialog li { color:var(--game-muted); font-size:13px; line-height:1.65; }.lunar-game .guide-dialog ol { display:grid; gap:6px; padding-left:22px; }.lunar-game .guide-dialog li b { color:var(--game-text); }.lunar-game .guide-dialog .guide-caveat { padding:12px; border-left:2px solid var(--game-gold); background:#201c13; font-size:11px; }
+@media (max-width:850px) { .lunar-game .mission-topbar { align-items:flex-start; flex-direction:column; }.lunar-game .clock-console { width:100%; justify-content:space-between; flex-wrap:wrap; }.lunar-game .assembly-layout,.lunar-game .pad-columns { grid-template-columns:1fr; }.lunar-game .rocket-stack { min-height:380px; }.lunar-game .flight-schematic { grid-template-columns:55px 70px 1fr; gap:10px; }.lunar-game .parts-list { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px) { .lunar-game { padding:12px 10px 26px; }.lunar-game .mission-brand h1 { font-size:12px; }.lunar-game .clock-console { align-items:flex-start; flex-direction:column; }.lunar-game .clock-controls { flex-wrap:wrap; }.lunar-game .window-track,.lunar-game .comms-list,.lunar-game .science-grid { grid-template-columns:1fr; }.lunar-game .phase-heading { align-items:flex-start; flex-direction:column; }.lunar-game .procedure-row { grid-template-columns:24px 1fr; }.lunar-game .procedure-row > :last-child { grid-column:2; justify-self:start; }.lunar-game .landing-grid { grid-template-columns:1fr; }.lunar-game .zone-card { min-height:80px; }.lunar-game .transit-data { grid-template-columns:1fr; } }
 
-.game-page * { box-sizing: border-box; }
-.game-page button, .game-page input, .game-page select { font: inherit; }
-.game-page button:focus-visible, .game-page input:focus-visible, .game-page select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
-.game-page button:disabled, .game-page select:disabled, .game-page input:disabled { opacity: .48; cursor: not-allowed; }
-.game-page h1, .game-page h2, .game-page h3, .game-page p { margin-top: 0; }
-.game-panel { min-width: 0; padding: 15px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel); }
-.panel-step, .view-overline { color: var(--cyan); font-size: 10px; font-weight: 700; letter-spacing: .1em; }
-.field-label, .minigame-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; }
-.game-page select { width: 100%; min-height: 34px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 3px; color: var(--text); background: var(--deep); }
-.game-button { padding: 7px 10px; border: 1px solid var(--border); border-radius: 3px; color: var(--text); background: var(--secondary); font-size: 11px; cursor: pointer; }
-.game-button:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan-hover); }
-.game-button.primary { border-color: var(--cyan); color: #071118; background: var(--cyan); font-weight: 700; }
-.game-button.primary:hover:not(:disabled) { background: var(--cyan-hover); }
-
-/* Top bar and one authoritative clock */
-.mission-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1500px; margin: 0 auto 12px; padding: 4px 2px 12px; border-bottom: 1px solid var(--border); }
-.mission-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.mission-brand > img { width: 31px; height: 30px; object-fit: contain; }
-.mission-brand > div > span { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
-.mission-brand h1 { margin: 2px 0 0; color: var(--text); font-size: clamp(13px, 1.4vw, 17px); letter-spacing: .02em; }
-.mission-brand h1 i { margin-left: 5px; color: var(--muted); font-size: 10px; font-style: normal; font-weight: 500; }
-.clock-console { display: flex; align-items: center; gap: 16px; }
-.clock-console > div:first-child { display: grid; gap: 1px; text-align: right; }
-.clock-console small { color: var(--muted); font-size: 9px; letter-spacing: .09em; }
-.clock-console strong { color: var(--cyan); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 19px; font-variant-numeric: tabular-nums; }
-.clock-controls { display: flex; align-items: center; gap: 7px; }
-.clock-controls label { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 10px; }
-.clock-controls select { width: 52px; min-height: 30px; padding: 4px; }
-.guide-open { border: 0; color: var(--cyan); background: transparent; font-size: 10px; cursor: pointer; }
-
-/* Persistent launch-window timeline */
-.launch-timeline-panel { max-width: 1500px; margin: 0 auto 12px; padding: 12px 15px; }
-.timeline-topline, .window-review, .sidebar-heading, .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.timeline-topline h2, .sidebar-heading h2, .panel-heading h2 { margin: 2px 0 0; color: var(--text); font-size: 15px; }
-.window-countdown { display: grid; gap: 1px; text-align: right; }
-.window-countdown b { color: var(--cyan); font-size: 11px; }
-.window-countdown b.countdown-active { color: var(--sun); }
-.window-countdown span { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
-.window-track { position: relative; height: 24px; margin: 17px 8px 12px; }
-.window-track-base { position: absolute; top: 11px; right: 0; left: 0; height: 2px; background: #39394a; }
-.window-segment { position: absolute; z-index: 1; top: 5px; min-width: 7px; height: 14px; padding: 0; border: 1px solid #586078; border-radius: 2px; background: #303347; cursor: pointer; }
-.window-segment.upcoming { border-color: #53627a; background: #26354a; }
-.window-segment.active { border-color: var(--sun); background: #8e671b; box-shadow: 0 0 8px #fbbf2438; }
-.window-segment.missed, .window-segment.skipped, .window-segment.closed { border-color: #555565; background: #353541; }
-.window-segment.used { border-color: var(--cyan); background: #176481; }
-.window-segment.selected { outline: 2px solid var(--cyan); outline-offset: 2px; }
-.game-time-ball { position: absolute; z-index: 3; top: 3px; width: 17px; height: 17px; border: 2px solid var(--deep); border-radius: 50%; background: var(--cyan); box-shadow: 0 0 0 2px var(--cyan); transform: translateX(-50%); transition: left .12s linear; }
-.window-track.paused .game-time-ball { background: var(--sun); box-shadow: 0 0 0 2px var(--sun); }
-.timeline-start, .timeline-end { position: absolute; top: 23px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 8px; }
-.timeline-start { left: 0; }.timeline-end { right: 0; }
-.window-strip-legend { display: flex; flex-wrap: wrap; gap: 6px 15px; color: var(--muted); font-size: 9px; }
-.window-strip-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border: 1px solid #606070; border-radius: 2px; vertical-align: -1px; }
-.upcoming-key { background: #26354a; }.active-key { border-color: var(--sun) !important; background: #8e671b; }.passed-key, .closed-key { background: #353541; }.ball-key { border-radius: 50% !important; border-color: var(--cyan) !important; background: var(--cyan); }
-.window-review { align-items: flex-start; margin-top: 10px; padding-top: 9px; border-top: 1px solid #242436; }
-.window-review > div { display: grid; gap: 2px; }
-.window-review strong { color: var(--text); font-size: 11px; }
-.window-review span, .window-review p, .window-review small { margin: 0; color: var(--muted); font-size: 10px; }
-.window-review small { color: #78788f; }
-
-/* Department workspace and mission side panel */
-.mission-workspace { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, .85fr); gap: 12px; max-width: 1500px; margin: 0 auto; align-items: start; }
-.department-main { min-width: 0; }
-.department-panel { min-height: 475px; padding: 0; overflow: hidden; }
-.department-tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--border); background: var(--deep); }
-.department-tabs button { display: grid; gap: 3px; min-height: 52px; padding: 8px 10px; border: 0; border-right: 1px solid var(--border); border-bottom: 2px solid transparent; color: var(--muted); background: transparent; text-align: left; cursor: pointer; font-size: 11px; }
-.department-tabs button:last-child { border-right: 0; }
-.department-tabs button.active { border-bottom-color: var(--cyan); color: var(--text); background: #10101b; }
-.department-tabs button small { color: #77778f; font-size: 9px; text-transform: uppercase; }
-.department-tabs button.active small { color: var(--cyan); }
-.minigame-content { padding: 20px; }
-.minigame-content h2 { margin: 4px 0 5px; color: var(--text); font-size: 20px; }
-.task-instructions { max-width: 780px; margin: 0 0 15px; color: var(--muted); font-size: 12px; }
-.diagnostic-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
-.diagnostic-board > div { display: grid; gap: 5px; padding: 13px; border: 1px solid var(--border); border-radius: 3px; background: var(--deep); }
-.diagnostic-board span { color: var(--text); font-size: 11px; font-weight: 600; }
-.diagnostic-board b { color: #ff756e; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; }
-.diagnostic-board b.status-ok { color: #72d39a; }
-.diagnostic-board small { color: var(--muted); font-size: 10px; }
-.diagnostic-fault { border-color: #815148 !important; }
-.minigame-controls { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 9px; }
-.minigame-feedback { margin: 12px 0 0; padding: 8px 10px; border-left: 2px solid var(--sun); color: var(--sun); background: #15120a; font-size: 11px; }
-.minigame-feedback.correct { border-color: #72d39a; color: #72d39a; background: #0d1711; }
-.minigame-feedback.wrong { border-color: #ff756e; color: #ff938c; background: #1c0e0e; }
-.optional-check { display: flex; align-items: center; gap: 7px; margin-top: 17px; padding: 10px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); font-size: 11px; }
-.optional-check input, .checklist-item input, .weather-options input, .channel-options input { accent-color: var(--cyan); }
-.optional-check em { margin-left: auto; color: var(--cyan); font-size: 9px; font-style: normal; white-space: nowrap; }
-.department-footnote { padding: 8px 2px; color: #77778f; font-size: 9px; }
-.checklist-grid { display: grid; gap: 8px; margin: 15px 0; }
-.checklist-item { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--deep); cursor: pointer; }
-.checklist-item > span { display: grid; gap: 3px; flex: 1; }
-.checklist-item b { color: var(--text); font-size: 11px; }
-.checklist-item small { color: var(--muted); font-size: 10px; }
-.checklist-item em { color: var(--sun); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 9px; font-style: normal; }
-.weather-readout { display: grid; gap: 4px; margin: 15px 0 11px; padding: 14px; border: 1px solid var(--border); border-left: 3px solid var(--cyan); background: var(--deep); }
-.weather-readout.go { border-left-color: #72d39a; }.weather-readout.caution { border-left-color: var(--sun); }.weather-readout.noGo { border-left-color: #ff756e; }
-.weather-readout span { color: var(--text); font-size: 12px; }.weather-readout strong { color: var(--cyan); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }.weather-readout.go strong { color: #72d39a; }.weather-readout.caution strong { color: var(--sun); }.weather-readout.noGo strong { color: #ff756e; }
-.weather-readout small { color: var(--muted); font-size: 10px; }
-.weather-options, .channel-options { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 12px; padding: 10px; border: 1px solid var(--border); }
-.weather-options legend, .channel-options legend { padding: 0 5px; color: var(--muted); font-size: 10px; }
-.weather-options label, .channel-options label { display: flex; align-items: center; gap: 5px; color: var(--text); font-size: 10px; cursor: pointer; }
-.scientific-caveat { display: block; margin-top: 10px; color: #77778f; font-size: 9px; }
-.signal-card { display: inline-grid; gap: 4px; min-width: 180px; margin: 7px 0 12px; padding: 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--deep); }
-.signal-card span { color: var(--muted); font-size: 9px; letter-spacing: .08em; }.signal-card strong { color: var(--earth); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 22px; }.signal-card small { color: var(--muted); font-size: 9px; }
-.channel-options label { min-width: 56px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 3px; }.channel-options label.selected { border-color: var(--cyan); color: var(--cyan); }
-
-/* Mission review / activity column */
-.mission-sidebar { display: grid; gap: 10px; }
-.sidebar-panel { padding: 12px; }
-.sidebar-heading { margin-bottom: 9px; }
-.sidebar-heading > b { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; }
-.sidebar-heading h2 { font-size: 13px; }
-.sidebar-panel .field-label { margin-bottom: 4px; }
-.site-coordinates { display: block; margin: 4px 0 9px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 9px; }
-.science-readout { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 9px; }
-.science-readout > div { display: grid; gap: 3px; padding: 8px; border: 1px solid var(--border); background: var(--deep); }
-.science-readout span { font-size: 9px; }.science-readout b { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 9px; }.science-readout small { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 8px; }
-.sun-data span, .sun-data b { color: var(--sun); }.earth-data span, .earth-data b { color: var(--earth); }
-.scientific-caveat { line-height: 1.4; }
-.status-pill { padding: 3px 6px; border: 1px solid #4a4a5b; border-radius: 2px; color: var(--muted); font-size: 8px !important; font-weight: 700; text-transform: uppercase; }
-.status-pill.ready { border-color: #397558; color: #72d39a; }.status-pill.warning { border-color: #8a6720; color: var(--sun); }
-.readiness-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
-.readiness-list li { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; }
-.readiness-state { color: #818198; font-size: 9px; font-weight: 600; text-align: right; text-transform: uppercase; }.readiness-state.ok { color: #72d39a; }.readiness-state.warning { color: var(--sun); }
-.optional-readiness { display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; margin-top: 8px; padding: 7px; background: var(--secondary); color: var(--text); font-size: 10px; }.optional-readiness b { color: var(--cyan); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }.optional-readiness small { grid-column: 1 / -1; color: var(--muted); font-size: 8px; }
-.launch-summary { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--border); }.launch-summary h3 { margin: 0 0 5px; color: var(--text); font-size: 11px; }.launch-summary p { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; color: var(--muted); font-size: 9px; }.launch-summary p b { color: var(--text); font-size: 9px; font-weight: 500; text-align: right; }
-.launch-blocker, .launch-permitted { margin-top: 7px; padding: 7px; border-left: 2px solid #ff756e; color: #ff938c; background: #1c0e0e; font-size: 9px; }.launch-permitted { border-color: #72d39a; color: #72d39a; background: #0d1711; }
-.launch-button { width: 100%; margin-top: 7px; }.launch-button:not(:disabled) { border-color: var(--sun); color: #150f02; background: var(--sun); }
-.activity-panel { min-height: 185px; }.activity-feed { display: grid; gap: 0; max-height: 260px; overflow-y: auto; padding-right: 3px; }.activity-feed article { display: grid; gap: 2px; padding: 7px 0; border-top: 1px solid #222233; }.activity-feed time { color: var(--cyan); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 8px; }.activity-feed b { color: var(--text); font-size: 10px; }.activity-feed p { margin: 0; color: var(--muted); font-size: 9px; }
-
-/* Window outcome and journey */
-.journey-panel, .no-launch-panel { max-width: 1200px; margin: 18px auto; }
-.outcome-badge { padding: 4px 8px; border: 1px solid var(--cyan); color: var(--cyan); font-size: 9px; letter-spacing: .08em; }.outcome-badge.successful { border-color: #72d39a; color: #72d39a; }.outcome-badge.delayed { border-color: var(--sun); color: var(--sun); }.outcome-badge.failed { border-color: #ff756e; color: #ff756e; }
-.journey-summary { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 10px; }.journey-svg { display: block; width: min(820px, 100%); height: 210px; margin: 0 auto; overflow: visible; }.journey-route-base { stroke: #3b3b4c; stroke-width: 2; stroke-dasharray: 5 7; }.journey-route-complete { fill: none; stroke: var(--cyan); stroke-width: 3; stroke-linecap: round; }.journey-earth { fill: #172c47; stroke: var(--earth); stroke-width: 2; }.journey-earth-grid { fill: none; stroke: var(--earth); stroke-width: 1; }.journey-moon { fill: #92929f; stroke: #d0d0df; stroke-width: 2; }.journey-crater { fill: #666676; }.journey-craft path { fill: var(--cyan); stroke: var(--deep); stroke-width: 1; }.journey-craft circle { fill: var(--deep); }.journey-svg text { fill: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 9px; letter-spacing: .08em; }
-.journey-stages { display: flex; justify-content: space-between; gap: 4px; max-width: 900px; margin: 0 auto 12px; }.journey-stages div { display: grid; justify-items: center; gap: 5px; color: #77778f; font-size: 9px; text-align: center; }.journey-stages i { width: 8px; height: 8px; border: 1px solid #666676; border-radius: 50%; background: var(--deep); }.journey-stages .reached i { border-color: var(--cyan); background: var(--cyan); }.journey-stages .current { color: var(--cyan); }
-.journey-status { display: flex; justify-content: space-between; gap: 12px; padding: 9px; border: 1px solid var(--border); background: var(--deep); }.journey-status strong { color: var(--cyan); font-size: 11px; }.journey-status span { color: var(--muted); font-size: 10px; }.mission-debrief { margin-top: 10px; padding: 13px; border-left: 3px solid var(--cyan); background: var(--secondary); }.mission-debrief.successful { border-color: #72d39a; }.mission-debrief.delayed { border-color: var(--sun); }.mission-debrief.failed { border-color: #ff756e; }.mission-debrief > span { color: var(--cyan); font-size: 9px; font-weight: 700; }.mission-debrief h3 { margin: 4px 0; color: var(--text); font-size: 15px; }.mission-debrief p { margin: 4px 0; color: var(--muted); font-size: 10px; }
-.journey-controls { display: flex; justify-content: center; align-items: center; gap: 10px; color: var(--muted); font-size: 10px; }.no-launch-panel h2 { margin: 5px 0; font-size: 21px; }.no-launch-panel p, .no-launch-panel > b { color: var(--muted); font-size: 12px; }
-.realtime-footer { max-width: 1500px; margin: 12px auto 0; color: #77778f; font-size: 9px; }
-.guide-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: 18px; background: #050505ed; }
-.guide-dialog { width: min(610px, 100%); max-height: 90vh; overflow-y: auto; padding: 22px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); }
-.guide-dialog h2 { margin: 5px 0; color: var(--text); font-size: 22px; }.guide-dialog p, .guide-dialog ol { color: var(--muted); font-size: 11px; line-height: 1.55; }.guide-dialog ol { display: grid; gap: 8px; padding-left: 20px; }.guide-dialog li strong { color: var(--text); }.guide-dialog .guide-caveat { padding: 8px; border-left: 2px solid var(--sun); background: var(--secondary); font-size: 10px; }.guide-dialog > button { margin-top: 3px; }
-
-@media (max-width: 980px) {
-  .mission-workspace { grid-template-columns: minmax(0, 1.3fr) minmax(270px, .9fr); }
-  .clock-console { gap: 9px; }
-}
-@media (max-width: 740px) {
-  .mission-topbar { align-items: flex-start; flex-direction: column; }
-  .clock-console { width: 100%; justify-content: space-between; }
-  .mission-workspace { grid-template-columns: 1fr; }
-  .mission-sidebar { grid-template-columns: 1fr 1fr; }
-  .activity-panel { grid-column: 1 / -1; }
-  .mission-brand h1 i { display: block; margin-left: 0; }
-}
-@media (max-width: 520px) {
-  .game-page { padding: 9px; }
-  .clock-console { align-items: flex-start; flex-direction: column; }
-  .clock-console > div:first-child { text-align: left; }
-  .clock-controls { flex-wrap: wrap; }
-  .mission-sidebar { grid-template-columns: 1fr; }
-  .activity-panel { grid-column: auto; }
-  .department-tabs button { padding: 7px 5px; font-size: 9px; }
-  .department-tabs button small { font-size: 7px; }
-  .minigame-content { padding: 13px; }
-  .diagnostic-board { grid-template-columns: 1fr; }
-  .minigame-controls { grid-template-columns: 1fr; }
-  .minigame-controls .game-button { min-height: 35px; }
-  .timeline-topline { align-items: flex-start; flex-direction: column; }
-  .window-countdown { text-align: left; }
-  .window-review { align-items: flex-start; flex-direction: column; }
-  .journey-svg { height: 150px; }
-  .journey-status { flex-direction: column; }
-  .journey-stages div { font-size: 7px; }
-  .science-readout { grid-template-columns: 1fr; }
-}
+/* The committed mission remains a viewport game; each phase owns the space below its console header. */
+.lunar-game { box-sizing:border-box; position:fixed; z-index:15; inset:0; display:flex; flex-direction:column; gap:8px; width:100vw; height:100vh; height:100dvh; min-height:0; overflow:hidden; padding:10px 20px 14px; }
+.lunar-game > .mission-topbar { flex:0 0 60px; width:100%; max-width:none; margin:0; padding:4px 0 9px; }
+.lunar-game > .mission-timeline { flex:0 0 auto; width:100%; max-width:none; margin:0; padding:9px 12px; }
+.lunar-game > .phase-heading { flex:0 0 auto; width:100%; max-width:none; margin:5px 0 0; }
+.lunar-game > .game-panel.phase-panel { flex:1 1 auto; width:100%; max-width:none; min-height:0; margin:0; overflow:auto; border:1px solid #30394d99; border-radius:4px; background:linear-gradient(120deg,#090c14e8,#111522df 55%,#0a0d15e8); box-shadow:inset 0 1px #ffffff08; }
+.lunar-game .mission-target { display:grid; gap:4px; padding:7px 10px; border-left:2px solid var(--game-gold); background:#131622; }.lunar-game .mission-target span { color:var(--game-gold); font-size:8px; letter-spacing:.08em; }.lunar-game .mission-target b { font-size:11px; }.lunar-game .mission-target small { color:var(--game-muted); font:9px ui-monospace,monospace; }
+.lunar-game > .phase-panel.countdown-phase { display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; max-width:none; text-align:center; }
+.lunar-game .lunar-scene-frame { height:clamp(220px,37vh,390px); }
+.lunar-game .game-panel.no-launch-phase { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; padding-left:clamp(25px,12vw,180px); }
+@media (max-height:760px) { .lunar-game { gap:5px; padding-top:6px; }.lunar-game > .mission-topbar { flex-basis:52px; }.lunar-game > .mission-timeline { padding:6px 9px; }.lunar-game .window-card { padding:6px 9px; }.lunar-game .window-card p { margin:4px 0; }.lunar-game .lunar-scene-frame { height:260px; }.lunar-game .assembly-layout { grid-template-columns:minmax(220px,.7fr) minmax(350px,1.3fr); }.lunar-game .rocket-stack { min-height:350px; }.lunar-game .parts-list { gap:5px; } }
+@media (max-width:700px) { .lunar-game { padding:8px; }.lunar-game > .mission-topbar { flex-basis:112px; align-items:flex-start; flex-direction:column; }.lunar-game > .phase-heading { align-items:flex-start; flex-direction:row; }.lunar-game > .game-panel.phase-panel { padding:14px; }.lunar-game .mission-target { max-width:48vw; }.lunar-game .assembly-layout { grid-template-columns:1fr; }.lunar-game .rocket-stack { min-height:340px; }.lunar-game .parts-list { grid-template-columns:1fr 1fr; }.lunar-game .pad-columns { grid-template-columns:1fr; }.lunar-game .flight-schematic { min-height:240px; }.lunar-game .lunar-scene-frame { height:250px; } }
+@media (max-width:700px) { .lunar-game > .mission-topbar { flex-basis:116px; justify-content:center; gap:4px; }.lunar-game > .mission-topbar .clock-console { display:grid; grid-template-columns:auto 1fr; width:100%; align-items:center; gap:6px; }.lunar-game > .mission-topbar .clock-console > div:first-child { gap:1px; }.lunar-game > .mission-topbar .clock-console strong { font-size:14px; }.lunar-game > .mission-topbar .clock-controls { flex-wrap:wrap; justify-content:flex-end; gap:4px; }.lunar-game > .mission-topbar .clock-controls .game-button { min-height:28px; padding:4px 6px; font-size:9px; }.lunar-game > .mission-topbar .clock-controls label { display:flex; align-items:center; gap:4px; }.lunar-game > .mission-topbar .clock-controls select { min-height:28px; padding:3px; font-size:9px; }.lunar-game > .mission-timeline { flex:0 0 92px; overflow:hidden; padding:6px; }.lunar-game .timeline-title { margin-bottom:5px; font-size:8px; }.lunar-game .timeline-title span:last-child { display:none; }.lunar-game .window-track { grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }.lunar-game .window-card { padding:5px; }.lunar-game .window-card > div { flex-wrap:wrap; gap:2px; }.lunar-game .window-card b,.lunar-game .window-card > div span { font-size:7px; }.lunar-game .window-card p { display:none; }.lunar-game .window-card small { display:block; font-size:6px; }.lunar-game .window-card .text-button { display:none; }.lunar-game > .phase-heading { flex-basis:auto; }.lunar-game .phase-heading h2 { font-size:17px; }.lunar-game .phase-heading p { font-size:10px; }.lunar-game .mission-target span { font-size:6px; }.lunar-game .mission-target b { font-size:9px; }.lunar-game .mission-target small { font-size:7px; } }
+@media (max-width:520px) { .lunar-game .assembly-layout { grid-template-columns:minmax(118px,.9fr) minmax(122px,1.1fr); gap:6px; }.lunar-game .rocket-stack { min-height:0; justify-content:center; padding:0; }.lunar-game .rocket-stack::after { bottom:4px; }.lunar-game .rocket-slot { min-height:27px; padding:2px; font-size:0; }.lunar-game .rocket-slot:first-child { width:min(75%,160px); }.lunar-game .rocket-slot:last-child { min-height:25px; width:min(88%,175px); }.lunar-game .rocket-slot:not(.installed)::after { content:"DROP COMPONENT"; color:#8793a9; font-size:6px; letter-spacing:.03em; }.lunar-game .rocket-slot > span { font-size:7px; }.lunar-game .rocket-slot.installed { font-size:7px; text-align:center; }.lunar-game .parts-panel { padding:5px; }.lunar-game .parts-panel > .eyebrow { font-size:7px; }.lunar-game .parts-list { grid-template-columns:1fr; gap:3px; margin-top:5px; }.lunar-game .part-card { min-height:25px; padding:4px; }.lunar-game .part-card b { overflow:hidden; font-size:7px; white-space:nowrap; }.lunar-game .part-card small { display:none; }.lunar-game .part-card i { width:6px; height:6px; flex:0 0 auto; }.lunar-game .parts-panel .feedback { font-size:8px; padding:5px; }.lunar-game .phase-copy { margin-bottom:8px; }.lunar-game .phase-copy h2 { font-size:15px; }.lunar-game .phase-copy p { font-size:9px; }.lunar-game .phase-action { margin-top:7px; padding-top:7px; } }
