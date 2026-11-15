@@ -31,6 +31,20 @@ export const RADIO_QUESTIONS = [
   { id: 'fairing', due: 138, question: 'What does a payload fairing do during ascent?', choices: ['Protects the payload from aerodynamic forces and heating', 'Slows the rocket down', 'Generates electricity for the lander'], correct: 0, explanation: 'The fairing shields the payload during atmospheric flight and is discarded after it is no longer needed.' },
 ];
 
+// Flight corridor clearance. Positions are fractions of the corridor monitor: x from the
+// left edge, y from the top. The ascent corridor runs up the centre line (x = 0.5) and the
+// two clearance lines stand CORRIDOR_CLEARANCE either side of it. The starting obstacles
+// are fixed, so every mission begins with the same range picture.
+export const CORRIDOR_CLEARANCE = 0.34;
+const CORRIDOR_START = [
+  { id: 'bird-1', kind: 'bird', x: 0.455, y: 0.8 },
+  { id: 'kite-1', kind: 'kite', x: 0.555, y: 0.7 },
+  { id: 'drone-1', kind: 'drone', x: 0.5, y: 0.6 },
+  { id: 'bird-2', kind: 'bird', x: 0.43, y: 0.5 },
+  { id: 'balloon-1', kind: 'balloon', x: 0.56, y: 0.36 },
+];
+const OBSTACLE_NAMES = { bird: 'bird', kite: 'kite', drone: 'drone', balloon: 'weather balloon' };
+
 const initialPad = () => ({
   startedAt: null,
   platformExtended: false,
@@ -39,7 +53,8 @@ const initialPad = () => ({
   oxidizerConnected: false,
   propellantStartedAt: null,
   propellantLoaded: false,
-  checks: { vehicle: false, spacecraft: false, site: false },
+  checks: { vehicle: false, spacecraft: false },
+  corridor: { obstacles: CORRIDOR_START.map((item) => ({ ...item, cleared: false })), feedback: '' },
   platformRetracted: false,
   onboardPower: false,
   countdownStartedAt: null,
@@ -88,16 +103,26 @@ export function getWeather(state) {
   return { clear, clearsAt, remaining: Math.max(0, clearsAt - state.elapsed), condition: clear ? 'Upper-level winds within limits · range sky clear' : 'Upper-level winds above limits · easing' };
 }
 
-export function getLaunchReadiness(state) {
+// The range picture: which obstacles are still inside the clearance lines, and the weather.
+// RANGE CLEAR is true only when every obstacle is out and suitable weather has been inspected.
+export function getCorridorStatus(state) {
+  const obstacles = state.pad.corridor?.obstacles || [];
+  const remaining = obstacles.filter((item) => !item.cleared).length;
   const weather = getWeather(state);
-  const weatherReady = weather.clear && state.pad.weatherAssessed;
+  const weatherReady = weather.clear && Boolean(state.pad.weatherAssessed);
+  return { obstacles, total: obstacles.length, remaining, obstaclesClear: remaining === 0, weather, weatherReady, rangeClear: remaining === 0 && weatherReady, feedback: state.pad.corridor?.feedback || '' };
+}
+
+export function getLaunchReadiness(state) {
+  const corridor = getCorridorStatus(state);
+  const { weather, weatherReady } = corridor;
   const deadline = getPreparationDeadline(state);
   const deadlineOpen = state.elapsed < deadline;
   const vehicleGo = state.installedParts.length === ASSEMBLY_COMPONENTS.length
     && state.pad.propellantLoaded && state.pad.checks.vehicle;
   const spacecraftGo = state.installedParts.length === ASSEMBLY_COMPONENTS.length
     && state.pad.checks.spacecraft && state.pad.onboardPower;
-  const siteWeatherGo = state.pad.checks.site && state.pad.platformRetracted && weatherReady;
+  const siteWeatherGo = state.pad.platformRetracted && corridor.rangeClear;
   const go = [vehicleGo, spacecraftGo, siteWeatherGo];
   const requirements = [
     ['Rocket and lander assembled', state.installedParts.length === ASSEMBLY_COMPONENTS.length],
@@ -105,9 +130,9 @@ export function getLaunchReadiness(state) {
     ['Propellant loading complete', state.pad.propellantLoaded],
     ['Vehicle check complete', state.pad.checks.vehicle],
     ['Spacecraft check and onboard power complete', state.pad.checks.spacecraft && state.pad.onboardPower],
-    ['Service platform retracted and site check complete', state.pad.platformRetracted && state.pad.checks.site],
+    ['Service platform retracted and flight corridor clear of obstacles', state.pad.platformRetracted && corridor.obstaclesClear],
   ];
-  return { weather, weatherReady, deadline, deadlineOpen, vehicleGo, spacecraftGo, siteWeatherGo, go, allGo: go.every(Boolean), canLaunch: go.every(Boolean) && deadlineOpen, requirements };
+  return { corridor, weather, weatherReady, deadline, deadlineOpen, vehicleGo, spacecraftGo, siteWeatherGo, go, allGo: go.every(Boolean), canLaunch: go.every(Boolean) && deadlineOpen, requirements };
 }
 
 function transition(state, phase, title, detail) {
@@ -118,6 +143,7 @@ function transition(state, phase, title, detail) {
 // clipboard, the launch-pad scene and the readiness lights can never disagree.
 export function getPadProcedure(state) {
   const pad = state.pad;
+  const corridor = getCorridorStatus(state);
   const status = (done, started) => (done ? 'done' : started ? 'active' : 'pending');
   const loading = pad.propellantStartedAt !== null && !pad.propellantLoaded;
   const steps = [
@@ -127,6 +153,7 @@ export function getPadProcedure(state) {
     { id: 'inspect', title: 'Complete vehicle and spacecraft inspections', how: 'Click the two inspection points on the vehicle.', status: status(pad.checks.vehicle && pad.checks.spacecraft, pad.checks.vehicle || pad.checks.spacecraft), parts: [['Vehicle', pad.checks.vehicle], ['Spacecraft', pad.checks.spacecraft]] },
     { id: 'retract', title: 'Retract access platform', how: 'Drag the access platform back to the tower.', status: status(pad.platformRetracted, false) },
     { id: 'power', title: 'Switch spacecraft to onboard power', how: 'Flip the power switch to ONBOARD.', status: status(pad.onboardPower, false) },
+    { id: 'corridor', title: 'Clear the flight corridor', how: corridor.obstaclesClear ? (corridor.weather.clear ? 'Inspect the weather on the corridor monitor.' : 'Wait for the upper-level winds to ease, then inspect the weather.') : 'On the corridor monitor, throw every obstacle past a clearance line.', status: status(corridor.rangeClear, corridor.remaining < corridor.total || Boolean(pad.weatherAssessed)), parts: [[`Obstacles ${corridor.total - corridor.remaining}/${corridor.total}`, corridor.obstaclesClear], ['Weather', corridor.weatherReady]] },
   ];
   const nextIndex = steps.findIndex((step) => step.status !== 'done');
   return steps.map((step, index) => ({ ...step, next: index === nextIndex }));
@@ -187,7 +214,7 @@ export function createDebugStageState(state, stageId, siteName) {
   if (target >= 3) {
     const realPad = getLaunchReadiness(state).allGo && Boolean(state.launch);
     if (!realPad) generated.push('Completed launch preparation and liftoff');
-    next.pad = realPad ? { ...state.pad, feedback: '' } : { ...initialPad(), startedAt: elapsed, platformRetracted: true, weatherAssessed: true, fuelConnected: true, oxidizerConnected: true, propellantStartedAt: elapsed, propellantLoaded: true, checks: { vehicle: true, spacecraft: true, site: true }, onboardPower: true, countdownStartedAt: elapsed, debug: true };
+    next.pad = realPad ? { ...state.pad, feedback: '' } : { ...initialPad(), startedAt: elapsed, platformRetracted: true, weatherAssessed: true, fuelConnected: true, oxidizerConnected: true, propellantStartedAt: elapsed, propellantLoaded: true, checks: { vehicle: true, spacecraft: true }, corridor: { obstacles: CORRIDOR_START.map((item) => ({ ...item, cleared: true })), feedback: '' }, onboardPower: true, countdownStartedAt: elapsed, debug: true };
     next.launch = realPad ? state.launch : { time: elapsed, debug: true };
   }
   const freshAscent = { launchedAt: elapsed, separatedAt: null, separationPenalty: 0, recoveryUsed: false, fairingSeparated: false, payloadSeparated: false, separationWindowNotified: false, fairingNotified: false, payloadNotified: false };
@@ -250,7 +277,7 @@ export function reducer(state, action) {
       return { ...state, assemblyFeedback: '' };
     case 'PROCEED_TO_PAD':
       if (state.phase !== 'assembly-complete') return state;
-      return transition({ ...state, pad: { ...state.pad, startedAt: state.elapsed } }, 'launchpad', 'Launch-pad preparation started', 'Extend the access platform, connect both propellant lines and complete the pad procedure. Scenario range weather is above limits for now and eases on a fixed schedule.');
+      return transition({ ...state, pad: { ...state.pad, startedAt: state.elapsed } }, 'launchpad', 'Launch-pad preparation started', 'Complete the pad procedure by hand and clear the flight corridor. Scenario range weather is above limits for now and eases on a fixed schedule.');
     case 'EXTEND_PLATFORM':
       if (state.phase !== 'launchpad' || state.pad.platformExtended || state.pad.platformRetracted) return state;
       return logEvent({ ...state, pad: { ...state.pad, platformExtended: true } }, 'Service platform extended', 'Ground crews can now access the vehicle connection points.');
@@ -260,10 +287,28 @@ export function reducer(state, action) {
     case 'ASSESS_WEATHER': {
       if (state.phase !== 'launchpad') return state;
       const weather = getWeather(state);
-      if (!weather.clear) return logEvent({ ...state, pad: { ...state.pad, weatherAssessed: false, feedback: `Weather inspected: upper-level winds are still above limits. They ease in about ${Math.ceil(weather.remaining)} mission seconds. Wait, then inspect again.` } }, 'Range weather inspected · hold', 'Scenario upper-level winds are above limits. The condition eases on a fixed schedule; no preparation progress is lost while waiting.');
+      const say = (feedback, weatherAssessed) => ({ ...state, pad: { ...state.pad, weatherAssessed, corridor: { ...state.pad.corridor, feedback } } });
+      if (!weather.clear) return logEvent(say(`Weather inspected: upper-level winds are still above limits. They ease in about ${Math.ceil(weather.remaining)} mission seconds. Wait, then inspect again.`, false), 'Range weather inspected · hold', 'Scenario upper-level winds are above limits. The condition eases on a fixed schedule; no preparation progress is lost while waiting.');
       if (state.pad.weatherAssessed) return state;
-      return logEvent({ ...state, pad: { ...state.pad, weatherAssessed: true, feedback: 'Weather inspected: conditions are suitable for launch in this scenario.' } }, 'Range weather inspected · suitable', 'Scenario upper-level winds are within limits. This is fixed game data, not a forecast.');
+      return logEvent(say('Weather inspected: upper-level winds are within limits for this scenario.', true), 'Range weather inspected · suitable', 'Scenario upper-level winds are within limits. This is fixed game data, not a forecast.');
     }
+    case 'RELEASE_OBSTACLE': {
+      // The player let go of an obstacle at (x, y), or it came to rest there after a throw.
+      // It only counts as cleared once it is past a clearance line.
+      const corridor = state.pad.corridor;
+      const obstacle = corridor?.obstacles.find((item) => item.id === action.id);
+      if (state.phase !== 'launchpad' || !obstacle || obstacle.cleared || !Number.isFinite(action.x) || !Number.isFinite(action.y)) return state;
+      const cleared = Math.abs(action.x - 0.5) >= CORRIDOR_CLEARANCE;
+      const obstacles = corridor.obstacles.map((item) => (item.id === obstacle.id ? { ...item, cleared, x: Math.min(0.96, Math.max(0.04, action.x)), y: Math.min(0.84, Math.max(0.05, action.y)) } : item));
+      const remaining = obstacles.filter((item) => !item.cleared).length;
+      const name = OBSTACLE_NAMES[obstacle.kind] || 'obstacle';
+      const feedback = !cleared ? `The ${name} is still inside the clearance lines. Throw it past one of the dashed lines.` : remaining ? `The ${name} is clear. ${remaining} more inside the clearance lines.` : 'Every obstacle is past the clearance lines.';
+      const next = { ...state, pad: { ...state.pad, corridor: { ...corridor, obstacles, feedback } } };
+      return cleared ? logEvent(next, `Flight corridor · ${name} cleared`, remaining ? `${remaining} obstacle${remaining === 1 ? '' : 's'} still inside the clearance lines.` : 'No obstacles remain inside the clearance lines. This is a game check, not a real launch-range safety assessment.') : next;
+    }
+    case 'RANGE_FEEDBACK':
+      if (state.phase !== 'launchpad' || typeof action.message !== 'string') return state;
+      return { ...state, pad: { ...state.pad, corridor: { ...state.pad.corridor, feedback: action.message } } };
     case 'TOGGLE_PROPELLANT_LINE': {
       if (state.phase !== 'launchpad' || state.pad.propellantStartedAt !== null) return state;
       if (!state.pad.platformExtended) return { ...state, pad: { ...state.pad, feedback: 'Extend the access platform to the vehicle first. Crews need it to reach the connection points.' } };
@@ -275,17 +320,15 @@ export function reducer(state, action) {
       if (!state.pad.platformExtended || !state.pad.fuelConnected || !state.pad.oxidizerConnected) return { ...state, pad: { ...state.pad, feedback: 'The loading valve stays shut until both the fuel and oxidiser lines are connected.' } };
       return logEvent({ ...state, pad: { ...state.pad, propellantStartedAt: state.elapsed, feedback: '' } }, 'Propellant loading started', 'The simulated loading process is underway. It completes after 35 mission seconds while the global clock runs.');
     case 'CHECK_PAD_ITEM': {
-      if (state.phase !== 'launchpad') return state;
+      if (state.phase !== 'launchpad' || (action.key !== 'vehicle' && action.key !== 'spacecraft')) return state;
       const allowed = action.key === 'vehicle'
         ? state.pad.propellantLoaded && state.pad.fuelConnected && state.pad.oxidizerConnected
         : action.key === 'spacecraft'
           ? state.installedParts.length === ASSEMBLY_COMPONENTS.length
-          : action.key === 'site'
-            ? state.pad.platformRetracted && getWeather(state).clear && state.pad.weatherAssessed
-            : false;
-      if (!allowed) return { ...state, pad: { ...state.pad, feedback: action.key === 'vehicle' ? 'Finish loading and verify both propellant lines first.' : action.key === 'site' ? 'Retract the service platform and inspect the weather once it is suitable first.' : 'Complete rocket assembly first.' } };
+          : false;
+      if (!allowed) return { ...state, pad: { ...state.pad, feedback: action.key === 'vehicle' ? 'Finish loading and verify both propellant lines first.' : 'Complete rocket assembly first.' } };
       const checks = { ...state.pad.checks, [action.key]: true };
-      return logEvent({ ...state, pad: { ...state.pad, checks, feedback: '' } }, `${({ vehicle: 'Vehicle connections', spacecraft: 'Spacecraft', site: 'Launch site' })[action.key]} check complete`, 'This simplified checklist item now contributes to its corresponding GO indication.');
+      return logEvent({ ...state, pad: { ...state.pad, checks, feedback: '' } }, `${({ vehicle: 'Vehicle connections', spacecraft: 'Spacecraft' })[action.key]} check complete`, 'This simplified checklist item now contributes to its corresponding GO indication.');
     }
     case 'PAD_FEEDBACK':
       // A hands-on attempt in the pad scene that changed nothing, for example a hose dropped on the wrong port.

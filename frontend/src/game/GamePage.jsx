@@ -3,6 +3,7 @@ import landingSites from '../data/landingSites.json';
 import { calculateEarthPosition, calculateSunPosition, clearanceOf } from '../utils/ephemerisRuntime';
 import { SCENARIO_START, SURVEY_DURATION_SECONDS, createInitialState, getLaunchReadiness, getPadProcedure, reducer } from './gameEngine';
 import DebugMenu from './DebugMenu';
+import FlightCorridor from './FlightCorridor';
 import { DEBUG_ENABLED, useKonamiCode } from './debugMode';
 import GameGuide from './GameGuide';
 import MissionHeader, { StageProgress } from './MissionHeader';
@@ -22,7 +23,7 @@ const ASSEMBLY_NOTES = {
 const phaseInfo = {
   assembly: ['STAGE 1 · ASSEMBLY', 'Build the launch stack', 'Drag each part from the rack onto the vehicle, or click a part and then click where it goes.'],
   'assembly-complete': ['STAGE 1 · ASSEMBLY', 'Vehicle assembled', 'Review the stack, then move to pad preparation.'],
-  launchpad: ['STAGE 2 · LAUNCH PREPARATION', 'Prepare for launch', 'Complete the pad procedure and get all three lights green before the preparation deadline.'],
+  launchpad: ['STAGE 2 · LAUNCH PREPARATION', 'Prepare for launch', 'Work the launch pad by hand, clear the flight corridor, and get all three lights green before the preparation deadline.'],
   countdown: ['STAGE 2 · LAUNCH PREPARATION · COUNTDOWN', 'Terminal countdown', 'Hold the launch command until the T−0 cue.'],
   ascent: ['STAGE 3 · ASCENT', 'Manage ascent and staging', 'Separate spent stages at the cues, then release the lander.'],
   transit: ['STAGE 4 · TRANSIT', 'Monitor the lunar transit', 'Switch between vehicle monitoring and Communications as the mission clock continues.'],
@@ -34,10 +35,10 @@ const phaseInfo = {
 const PAD_STATUS = { done: 'COMPLETED', active: 'IN PROGRESS', pending: 'PENDING' };
 
 // Launch preparation. The clipboard on the left only reports; every step is done by hand on
-// the launch pad in the 3D scene (MissionScene3D), which sends the same reducer actions.
+// the launch pad in the 3D scene (MissionScene3D) or on the flight corridor monitor on the
+// right. Both send actions to the one reducer; the three lights read the result.
 function LaunchPad({ state, dispatch }) {
   const readiness = getLaunchReadiness(state);
-  const weather = readiness.weather;
   const pad = state.pad;
   const steps = getPadProcedure(state);
   const nextStep = steps.find((step) => step.next);
@@ -54,7 +55,7 @@ function LaunchPad({ state, dispatch }) {
     <div className="pad-centre">
       <div className="pad-scene-window" data-scene-window aria-hidden="true" />
       <div className="pad-status-strip">
-        <p className="pad-hint" role="status"><b>{pad.feedback ? 'PAD CREW' : 'NEXT'}</b>{pad.feedback || nextStep?.how || 'Pad procedure complete. Finish the range checks on the right, then begin the countdown.'}</p>
+        <p className="pad-hint" role="status"><b>{pad.feedback ? 'PAD CREW' : 'NEXT'}</b>{pad.feedback || nextStep?.how || 'Every step is complete. Begin the terminal countdown.'}</p>
         <div className="pad-keyboard-actions" role="group" aria-label="Keyboard controls for the launch pad equipment">
           <span>KEYBOARD CONTROLS</span>
           <Button onClick={() => dispatch({ type: pad.platformExtended ? 'RETRACT_PLATFORM' : 'EXTEND_PLATFORM' })} disabled={pad.platformRetracted}>{pad.platformExtended ? 'Retract access platform' : 'Extend access platform'}</Button>
@@ -65,15 +66,14 @@ function LaunchPad({ state, dispatch }) {
           <Button onClick={() => dispatch({ type: 'CHECK_PAD_ITEM', key: 'spacecraft' })} disabled={pad.checks.spacecraft}>Inspect spacecraft</Button>
           <Button onClick={() => dispatch({ type: 'SWITCH_ONBOARD_POWER' })} disabled={pad.onboardPower}>Switch to onboard power</Button>
         </div>
-        <p className="stage-caveat">Simplified training procedure on a schematic pad. Scenario weather is fixed game data, not a live forecast.</p>
+        <div className="launch-gate">
+          <div className="go-lights" aria-label="Launch readiness lights">{statuses.map((item) => <div key={item.name}><i className={item.go ? 'on' : ''} /><b>{item.name}</b><span>{item.go ? 'GO' : 'WAIT'}</span></div>)}</div>
+          <Button className="primary-action" disabled={!readiness.canLaunch} onClick={() => dispatch({ type: 'START_COUNTDOWN' })}>{readiness.allGo ? 'Begin terminal countdown' : 'Get all three lights green'}</Button>
+        </div>
+        <p className="stage-caveat">Simplified training procedure on a schematic pad. The corridor and weather are fixed game data, not a forecast or a real launch-range safety check.</p>
       </div>
     </div>
-    <div className="window-review"><span className="eyebrow">RANGE WEATHER · FIXED SCENARIO DATA</span><h3>Inspect the weather</h3><p>One training condition on the mission clock: upper-level winds start above limits and ease {Math.ceil(weather.remaining) > 0 ? `in about ${Math.ceil(weather.remaining)} mission seconds` : 'early in pad preparation'}. It is not a forecast.</p>
-        <div className="weather-meter"><span>UPPER-LEVEL WIND</span><b>{weather.clear ? 'WITHIN LIMITS · SUITABLE' : `ABOVE LIMITS · EASES IN ${Math.ceil(weather.remaining)} S`}</b><i className={weather.clear ? '' : 'caution'} /></div>
-        <div className="inline-actions weather-choice"><Button onClick={() => dispatch({ type: 'ASSESS_WEATHER' })} disabled={state.pad.weatherAssessed}>{state.pad.weatherAssessed ? 'Weather inspected ✓' : 'Inspect weather'}</Button><Button onClick={() => dispatch({ type: 'CHECK_PAD_ITEM', key: 'site' })} disabled={state.pad.checks.site}>{state.pad.checks.site ? 'Launch site ✓' : 'Complete launch-site check'}</Button></div>
-        <div className="go-lights">{statuses.map((item) => <div key={item.name}><i className={item.go ? 'on' : ''} /><b>{item.name}</b><span>{item.go ? 'GO' : 'WAIT'}</span></div>)}</div>
-        <Button className="primary-action" disabled={!readiness.canLaunch} onClick={() => dispatch({ type: 'START_COUNTDOWN' })}>{readiness.allGo ? 'Begin terminal countdown' : 'Get all three lights green to continue'}</Button>
-    </div>
+    <div className="window-review corridor-panel"><FlightCorridor state={state} dispatch={dispatch} /></div>
   </section>;
 }
 
