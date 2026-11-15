@@ -685,6 +685,17 @@ const createFatLine = (color, linewidth, opacity) => {
   return line;
 };
 
+const HOUR_MS = 3600000;
+const LUNAR_DAY_MS = 29.53 * 86400000;
+
+/** Draws the thin Sun and Earth paths for the lunar day that starts at `startTime`. */
+const drawSkyPaths = (stage, site, startTime) => {
+  const toPoints = (positionCalculator) => getSkyPath(startTime, positionCalculator, site.latitude, site.longitude)
+    .map((sample) => skyPoint(sample.azimuth, sample.elevation, SKY_RADIUS * 0.99));
+  setFatLinePoints(stage.sunPath, toPoints(calculateSunPosition));
+  setFatLinePoints(stage.earthPath, toPoints(calculateEarthPosition));
+};
+
 const setFatLinePoints = (line, points) => {
   if (points.length < 2) { line.visible = false; return; }
   const flat = new Float32Array(points.length * 3);
@@ -1130,11 +1141,8 @@ const LunarScene3D = ({
     let built = null;
     const mask = getHorizonMask(selectedSite.latitude, selectedSite.longitude, useTerrain);
 
-    const toPoints = (path, radius) => path.map((sample) => skyPoint(sample.azimuth, sample.elevation, radius));
-    const sunSamples = getSkyPath(windowStart, calculateSunPosition, selectedSite.latitude, selectedSite.longitude);
-    const earthSamples = getSkyPath(windowStart, calculateEarthPosition, selectedSite.latitude, selectedSite.longitude);
-    setFatLinePoints(stage.sunPath, toPoints(sunSamples, SKY_RADIUS * 0.99));
-    setFatLinePoints(stage.earthPath, toPoints(earthSamples, SKY_RADIUS * 0.99));
+    // Sky paths for the first lunar day; the per-time effect redraws them if the time moves into a later one.
+    drawSkyPaths(stage, selectedSite, windowStart);
 
     // The height tiles are fetched per site (about 460 KB), so the ground appears a moment after the sky.
     loadTerrainTiles(selectedSite.id).then(({ meta, raw }) => {
@@ -1156,7 +1164,7 @@ const LunarScene3D = ({
       stage.skyRoot.add(skyline.group);
       built = { group, skyline };
       siteRef.current = {
-        terrain, applySunlight, skyline, surveyGrid, sunSamples, earthSamples, fresh: true
+        terrain, applySunlight, skyline, surveyGrid, pathDay: 0, fresh: true
       };
       setSiteVersion((version) => version + 1);
     }).catch((error) => console.error(error));
@@ -1243,17 +1251,33 @@ const LunarScene3D = ({
     if (stage.linkBeam.visible) setFatLinePoints(stage.linkBeam, [dishWorld, earthTarget]);
 
     // Bright trail = where the body has just been; thin line = its whole lunar-day path.
-    const hourIndex = Math.max(0, Math.min(site.sunSamples.length - 1, Math.round((time.getTime() - windowStart.getTime()) / 3600000)));
-    const trail = (samples, hoursBack, current) => [
-      ...samples.slice(Math.max(0, hourIndex - hoursBack), hourIndex).map((sample) => skyPoint(sample.azimuth, sample.elevation, SKY_RADIUS * 0.988)),
-      skyPoint(current.azimuth, current.elevation, SKY_RADIUS * 0.988)
-    ];
+    // Both follow the current time. The main site stays inside one lunar day, but the game's planning
+    // stage scrubs across several, and the trail must not be anchored to the end of the first one.
+    const timeMs = time.getTime();
+    const startMs = windowStart.getTime();
+    const pathDay = Math.max(0, Math.ceil((timeMs - startMs) / LUNAR_DAY_MS) - 1);
+    if (site.pathDay !== pathDay) {
+      drawSkyPaths(stage, selectedSite, new Date(startMs + pathDay * LUNAR_DAY_MS));
+      site.pathDay = pathDay;
+    }
+    const lastHourMs = Math.floor(timeMs / HOUR_MS) * HOUR_MS;
+    const trail = (positionCalculator, hoursBack, current) => {
+      const points = [];
+      for (let hour = hoursBack - 1; hour >= 0; hour -= 1) {
+        const sampleMs = lastHourMs - hour * HOUR_MS;
+        if (sampleMs < startMs || sampleMs >= timeMs) continue;
+        const sample = positionCalculator(new Date(sampleMs), selectedSite.latitude, selectedSite.longitude);
+        points.push(skyPoint(sample.azimuth, sample.elevation, SKY_RADIUS * 0.988));
+      }
+      points.push(skyPoint(current.azimuth, current.elevation, SKY_RADIUS * 0.988));
+      return points;
+    };
     stage.sunPath.visible = showSolarFlux;
     stage.sunTrail.visible = showSolarFlux;
     stage.earthPath.visible = showDTELink;
     stage.earthTrail.visible = showDTELink;
-    if (showSolarFlux) setFatLinePoints(stage.sunTrail, trail(site.sunSamples, 72, sunPosition));
-    if (showDTELink) setFatLinePoints(stage.earthTrail, trail(site.earthSamples, 120, earthPosition));
+    if (showSolarFlux) setFatLinePoints(stage.sunTrail, trail(calculateSunPosition, 72, sunPosition));
+    if (showDTELink) setFatLinePoints(stage.earthTrail, trail(calculateEarthPosition, 120, earthPosition));
 
     stage.skyGrid.visible = showGrid;
     site.surveyGrid.visible = showHorizonMask;
