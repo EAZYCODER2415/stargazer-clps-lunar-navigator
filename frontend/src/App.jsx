@@ -19,6 +19,7 @@ import HelpCard from './components/HelpCard';
 import landingSites from './data/landingSites.json';
 
 const LUNAR_DAY_MS = 29.53 * 86400000;
+const PLAN_HASH = '#plan';
 
 function App() {
   const initialTime = new Date('2026-12-01T00:00:00Z');
@@ -41,8 +42,22 @@ function App() {
   const [showGrid, setShowGrid] = useState(true);
   const [showHorizonMask, setShowHorizonMask] = useState(false);   // survey grid over the ground: off until asked for
   const [invertLook, setInvertLook] = useState(false);
-  const [showComparison, setShowComparison] = useState(false);
-  const closeComparison = useCallback(() => setShowComparison(false), []);
+  // The Compare sites view ("Plan") follows the URL: #plan opens it, so a home page button can link straight to it.
+  const [showComparison, setShowComparison] = useState(() => window.location.hash === PLAN_HASH);
+  useEffect(() => {
+    const onHashChange = () => setShowComparison(window.location.hash === PLAN_HASH);
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+  const openComparison = useCallback(() => {
+    window.history.replaceState(null, '', PLAN_HASH);
+    setShowComparison(true);
+  }, []);
+  const closeComparison = useCallback(() => {
+    // Clear the hash without leaving a "#" behind or adding a history entry.
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    setShowComparison(false);
+  }, []);
   const [showInterface, setShowInterface] = useState(true);
   const [cameraSensitivity, setCameraSensitivity] = useState(1.8);
   const [cameraInfo, setCameraInfo] = useState(null);
@@ -312,7 +327,7 @@ function App() {
               />
             )}
             {!showComparison && (
-              <button type="button" className="compare-launch-button" onClick={() => setShowComparison(true)}>
+              <button type="button" className="compare-launch-button" onClick={openComparison}>
                 Compare sites
               </button>
             )}
