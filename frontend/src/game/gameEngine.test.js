@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSEMBLY_COMPONENTS, GAME_SPEEDS, MISSION_STAGES, WEATHER_HOLD_SECONDS, createInitialState, getLaunchReadiness, getStageIndex, getWeather, reducer } from './gameEngine.js';
+import { ASSEMBLY_COMPONENTS, GAME_SPEEDS, MISSION_STAGES, WEATHER_HOLD_SECONDS, createInitialState, getLaunchReadiness, getPadProcedure, getStageIndex, getWeather, reducer } from './gameEngine.js';
 
 const send = (state, type, fields = {}) => reducer(state, { type, ...fields });
 const tick = (state, delta) => send(state, 'TICK', { delta });
@@ -91,6 +91,42 @@ test('assembly requires matching sockets and persists through pad preparation', 
   state = send(state, 'PROCEED_TO_PAD');
   assert.equal(state.phase, 'launchpad');
   assert.equal(state.installedParts.length, ASSEMBLY_COMPONENTS.length);
+});
+
+test('pad procedure status follows pad state, with feedback for attempts out of order', () => {
+  let state = enterMission();
+  for (const part of ASSEMBLY_COMPONENTS) state = send(state, 'INSTALL_PART', { partId: part.id, slotId: part.slot });
+  state = send(state, 'PROCEED_TO_PAD');
+  const statuses = () => getPadProcedure(state).map((step) => step.status);
+  assert.deepEqual(statuses(), ['pending', 'pending', 'pending', 'pending', 'pending', 'pending']);
+  assert.equal(getPadProcedure(state)[0].next, true);
+  state = send(state, 'TOGGLE_PROPELLANT_LINE', { line: 'fuel' });
+  assert.equal(state.pad.fuelConnected, false);
+  assert.match(state.pad.feedback, /Extend the access platform/);
+  state = send(state, 'RETRACT_PLATFORM');
+  assert.equal(state.pad.platformRetracted, false);
+  state = send(state, 'EXTEND_PLATFORM');
+  state = send(state, 'TOGGLE_PROPELLANT_LINE', { line: 'fuel' });
+  assert.deepEqual(statuses(), ['done', 'active', 'pending', 'pending', 'pending', 'pending']);
+  state = send(state, 'START_PROPELLANT_LOADING');
+  assert.equal(state.pad.propellantStartedAt, null);
+  assert.match(state.pad.feedback, /valve stays shut/);
+  state = send(state, 'PAD_FEEDBACK', { message: 'Wrong port.' });
+  assert.equal(state.pad.feedback, 'Wrong port.');
+  state = send(state, 'TOGGLE_PROPELLANT_LINE', { line: 'oxidizer' });
+  state = send(state, 'START_PROPELLANT_LOADING');
+  state = send(state, 'CHECK_PAD_ITEM', { key: 'vehicle' });
+  assert.equal(state.pad.checks.vehicle, false);
+  state = send(state, 'CHECK_PAD_ITEM', { key: 'spacecraft' });
+  assert.deepEqual(statuses(), ['done', 'done', 'active', 'active', 'pending', 'pending']);
+  state = send(state, 'SWITCH_ONBOARD_POWER');
+  assert.equal(state.pad.onboardPower, false);
+  state = tick(state, 35);
+  state = send(state, 'CHECK_PAD_ITEM', { key: 'vehicle' });
+  state = send(state, 'RETRACT_PLATFORM');
+  state = send(state, 'SWITCH_ONBOARD_POWER');
+  assert.deepEqual(statuses(), ['done', 'done', 'done', 'done', 'done', 'done']);
+  assert.deepEqual(getLaunchReadiness(state).go, [true, true, false]);
 });
 
 test('weather is one fixed condition that clears on the mission clock and must be inspected', () => {

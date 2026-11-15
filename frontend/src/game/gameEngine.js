@@ -114,6 +114,24 @@ function transition(state, phase, title, detail) {
   return logEvent({ ...state, phase }, title, detail);
 }
 
+// The pad procedure as the clipboard shows it. Status comes only from pad state, so the
+// clipboard, the launch-pad scene and the readiness lights can never disagree.
+export function getPadProcedure(state) {
+  const pad = state.pad;
+  const status = (done, started) => (done ? 'done' : started ? 'active' : 'pending');
+  const loading = pad.propellantStartedAt !== null && !pad.propellantLoaded;
+  const steps = [
+    { id: 'extend', title: 'Extend vehicle access platform', how: 'Drag the yellow access platform across to the vehicle.', status: status(pad.platformExtended || pad.platformRetracted, false) },
+    { id: 'lines', title: 'Connect fuel and oxidiser lines', how: 'Drag each hose end to the port ringed in the same colour.', status: status(pad.fuelConnected && pad.oxidizerConnected, pad.fuelConnected || pad.oxidizerConnected), parts: [['Fuel line', pad.fuelConnected], ['Oxidiser line', pad.oxidizerConnected]] },
+    { id: 'load', title: 'Load propellant', how: loading ? 'Loading is running on the mission clock. Inspect the spacecraft while you wait.' : 'Slide the loading valve open.', status: status(pad.propellantLoaded, loading), percent: pad.propellantLoaded ? 100 : loading ? Math.min(99, Math.floor((state.elapsed - pad.propellantStartedAt) / PROPELLANT_LOAD_SECONDS * 100)) : 0 },
+    { id: 'inspect', title: 'Complete vehicle and spacecraft inspections', how: 'Click the two inspection points on the vehicle.', status: status(pad.checks.vehicle && pad.checks.spacecraft, pad.checks.vehicle || pad.checks.spacecraft), parts: [['Vehicle', pad.checks.vehicle], ['Spacecraft', pad.checks.spacecraft]] },
+    { id: 'retract', title: 'Retract access platform', how: 'Drag the access platform back to the tower.', status: status(pad.platformRetracted, false) },
+    { id: 'power', title: 'Switch spacecraft to onboard power', how: 'Flip the power switch to ONBOARD.', status: status(pad.onboardPower, false) },
+  ];
+  const nextIndex = steps.findIndex((step) => step.status !== 'done');
+  return steps.map((step, index) => ({ ...step, next: index === nextIndex }));
+}
+
 // The seven mission stages shown in the header progress bar and the debug menu.
 export const MISSION_STAGES = [
   { id: 'planning', short: 'Planning', label: 'Stage 0 — Mission Planning' },
@@ -247,12 +265,14 @@ export function reducer(state, action) {
       return logEvent({ ...state, pad: { ...state.pad, weatherAssessed: true, feedback: 'Weather inspected: conditions are suitable for launch in this scenario.' } }, 'Range weather inspected · suitable', 'Scenario upper-level winds are within limits. This is fixed game data, not a forecast.');
     }
     case 'TOGGLE_PROPELLANT_LINE': {
-      if (state.phase !== 'launchpad' || !state.pad.platformExtended || state.pad.propellantStartedAt !== null) return state;
+      if (state.phase !== 'launchpad' || state.pad.propellantStartedAt !== null) return state;
+      if (!state.pad.platformExtended) return { ...state, pad: { ...state.pad, feedback: 'Extend the access platform to the vehicle first. Crews need it to reach the connection points.' } };
       const key = action.line === 'fuel' ? 'fuelConnected' : 'oxidizerConnected';
       return logEvent({ ...state, pad: { ...state.pad, [key]: !state.pad[key], feedback: '' } }, `${action.line === 'fuel' ? 'Fuel' : 'Oxidiser'} umbilical ${state.pad[key] ? 'disconnected' : 'connected'}`, 'The generic training vehicle uses separately labelled fuel and oxidiser service lines. Real propellant systems vary by vehicle.');
     }
     case 'START_PROPELLANT_LOADING':
-      if (state.phase !== 'launchpad' || !state.pad.platformExtended || !state.pad.fuelConnected || !state.pad.oxidizerConnected || state.pad.propellantStartedAt !== null) return state;
+      if (state.phase !== 'launchpad' || state.pad.propellantStartedAt !== null) return state;
+      if (!state.pad.platformExtended || !state.pad.fuelConnected || !state.pad.oxidizerConnected) return { ...state, pad: { ...state.pad, feedback: 'The loading valve stays shut until both the fuel and oxidiser lines are connected.' } };
       return logEvent({ ...state, pad: { ...state.pad, propellantStartedAt: state.elapsed, feedback: '' } }, 'Propellant loading started', 'The simulated loading process is underway. It completes after 35 mission seconds while the global clock runs.');
     case 'CHECK_PAD_ITEM': {
       if (state.phase !== 'launchpad') return state;
@@ -267,6 +287,10 @@ export function reducer(state, action) {
       const checks = { ...state.pad.checks, [action.key]: true };
       return logEvent({ ...state, pad: { ...state.pad, checks, feedback: '' } }, `${({ vehicle: 'Vehicle connections', spacecraft: 'Spacecraft', site: 'Launch site' })[action.key]} check complete`, 'This simplified checklist item now contributes to its corresponding GO indication.');
     }
+    case 'PAD_FEEDBACK':
+      // A hands-on attempt in the pad scene that changed nothing, for example a hose dropped on the wrong port.
+      if (state.phase !== 'launchpad' || typeof action.message !== 'string') return state;
+      return { ...state, pad: { ...state.pad, feedback: action.message } };
     case 'SWITCH_ONBOARD_POWER':
       if (state.phase !== 'launchpad' || !state.pad.platformRetracted || state.pad.onboardPower) return { ...state, pad: { ...state.pad, feedback: 'Retract the service platform before switching the spacecraft to onboard power.' } };
       return logEvent({ ...state, pad: { ...state.pad, onboardPower: true, feedback: '' } }, 'Spacecraft switched to onboard power', 'The lander is no longer using the ground power connection.');

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import landingSites from '../data/landingSites.json';
 import { calculateEarthPosition, calculateSunPosition, clearanceOf } from '../utils/ephemerisRuntime';
-import { PROPELLANT_LOAD_SECONDS, SCENARIO_START, SURVEY_DURATION_SECONDS, createInitialState, getLaunchReadiness, reducer } from './gameEngine';
+import { SCENARIO_START, SURVEY_DURATION_SECONDS, createInitialState, getLaunchReadiness, getPadProcedure, reducer } from './gameEngine';
 import DebugMenu from './DebugMenu';
 import { DEBUG_ENABLED, useKonamiCode } from './debugMode';
 import GameGuide from './GameGuide';
@@ -31,50 +31,47 @@ const phaseInfo = {
   'no-launch': ['PREPARATION DEADLINE', 'The planned schedule expired', 'The vehicle was not ready before the game-clock preparation deadline. Return to planning and choose an opportunity that leaves more preparation time.'],
 };
 
+const PAD_STATUS = { done: 'COMPLETED', active: 'IN PROGRESS', pending: 'PENDING' };
+
+// Launch preparation. The clipboard on the left only reports; every step is done by hand on
+// the launch pad in the 3D scene (MissionScene3D), which sends the same reducer actions.
 function LaunchPad({ state, dispatch }) {
-  const [dropActive, setDropActive] = useState(false);
-  const [dropMessage, setDropMessage] = useState('');
   const readiness = getLaunchReadiness(state);
   const weather = readiness.weather;
+  const pad = state.pad;
+  const steps = getPadProcedure(state);
+  const nextStep = steps.find((step) => step.next);
   const statuses = readiness.go.map((go, index) => ({ name: ['VEHICLE', 'SPACECRAFT', 'SITE / WEATHER'][index], go }));
-  function makeEquipmentDraggable(event, action) {
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', action);
-  }
-  function dropEquipment(event) {
-    event.preventDefault();
-    setDropActive(false);
-    const action = event.dataTransfer.getData('text/plain');
-    const actions = {
-      'platform-extend': ['EXTEND_PLATFORM', 'Access platform moved into position on the launch monitor.'],
-      'platform-retract': ['RETRACT_PLATFORM', 'Access platform cleared the vehicle on the launch monitor.'],
-      'fuel-connect': ['TOGGLE_PROPELLANT_LINE', 'Fuel umbilical moved to the vehicle.'],
-      'oxidizer-connect': ['TOGGLE_PROPELLANT_LINE', 'Oxidiser umbilical moved to the vehicle.'],
-    };
-    const mapped = actions[action];
-    if (!mapped) return;
-    dispatch(action === 'fuel-connect' ? { type: mapped[0], line: 'fuel' } : action === 'oxidizer-connect' ? { type: mapped[0], line: 'oxidizer' } : { type: mapped[0] });
-    setDropMessage(mapped[1]);
-  }
   return <section className="game-panel phase-panel pad-phase">
-    <div className="pad-checklist"><span className="eyebrow">PAD PROCEDURE</span>
-        <div className="procedure-row"><b>01</b><span>Extend vehicle access platform</span><Button draggable={!state.pad.platformExtended && !state.pad.platformRetracted} onDragStart={(event) => makeEquipmentDraggable(event, 'platform-extend')} onClick={() => dispatch({ type: 'EXTEND_PLATFORM' })} disabled={state.pad.platformExtended || state.pad.platformRetracted}>{state.pad.platformExtended ? 'EXTENDED' : 'Extend · drag'}</Button></div>
-        <div className="procedure-row"><b>02</b><span>Connect fuel and oxidiser lines</span><div className="inline-actions"><Button draggable={state.pad.platformExtended && state.pad.propellantStartedAt === null} onDragStart={(event) => makeEquipmentDraggable(event, 'fuel-connect')} onClick={() => dispatch({ type: 'TOGGLE_PROPELLANT_LINE', line: 'fuel' })} disabled={!state.pad.platformExtended || state.pad.propellantStartedAt !== null}>{state.pad.fuelConnected ? 'Fuel ✓' : 'Fuel · drag'}</Button><Button draggable={state.pad.platformExtended && state.pad.propellantStartedAt === null} onDragStart={(event) => makeEquipmentDraggable(event, 'oxidizer-connect')} onClick={() => dispatch({ type: 'TOGGLE_PROPELLANT_LINE', line: 'oxidizer' })} disabled={!state.pad.platformExtended || state.pad.propellantStartedAt !== null}>{state.pad.oxidizerConnected ? 'Oxidiser ✓' : 'Oxidiser · drag'}</Button></div></div>
-        <div className="procedure-row"><b>03</b><span>Load propellant · {state.pad.propellantLoaded ? 'complete' : state.pad.propellantStartedAt !== null ? 'in progress' : 'ready'}</span><Button onClick={() => dispatch({ type: 'START_PROPELLANT_LOADING' })} disabled={!state.pad.platformExtended || !state.pad.fuelConnected || !state.pad.oxidizerConnected || state.pad.propellantStartedAt !== null}>{state.pad.propellantLoaded ? 'Loaded' : state.pad.propellantStartedAt !== null ? 'Loading…' : 'Start load'}</Button></div>
-        <div className="procedure-row"><b>04</b><span>Complete vehicle and spacecraft checks</span><div className="inline-actions"><Button onClick={() => dispatch({ type: 'CHECK_PAD_ITEM', key: 'vehicle' })} disabled={state.pad.checks.vehicle}>{state.pad.checks.vehicle ? 'Vehicle ✓' : 'Vehicle check'}</Button><Button onClick={() => dispatch({ type: 'CHECK_PAD_ITEM', key: 'spacecraft' })} disabled={state.pad.checks.spacecraft}>{state.pad.checks.spacecraft ? 'Spacecraft ✓' : 'Spacecraft check'}</Button></div></div>
-        <div className="procedure-row"><b>05</b><span>Retract access platform</span><Button draggable={state.pad.platformExtended && state.pad.propellantLoaded && state.pad.checks.vehicle && state.pad.checks.spacecraft} onDragStart={(event) => makeEquipmentDraggable(event, 'platform-retract')} onClick={() => dispatch({ type: 'RETRACT_PLATFORM' })} disabled={state.pad.platformRetracted}>{state.pad.platformRetracted ? 'Clear ✓' : 'Retract · drag'}</Button></div>
-        <div className="procedure-row"><b>06</b><span>Switch spacecraft to onboard power</span><Button onClick={() => dispatch({ type: 'SWITCH_ONBOARD_POWER' })} disabled={state.pad.onboardPower}>{state.pad.onboardPower ? 'Onboard ✓' : 'Switch power'}</Button></div>
-    </div>
+    <aside className="pad-clipboard" aria-label="Pad procedure clipboard">
+      <div className="clipboard-clip" aria-hidden="true" />
+      <div className="clipboard-sheet">
+        <header><span>FORM LP-02 · TRAINING PROCEDURE</span><h3>PAD PROCEDURE</h3><small>MISSION 001 · {steps.filter((step) => step.status === 'done').length} OF {steps.length} STEPS COMPLETE</small></header>
+        <ol>{steps.map((step, index) => <li key={step.id} className={`${step.status}${step.next ? ' next' : ''}`}><b>{String(index + 1).padStart(2, '0')}</b><div><p>{step.title}</p>{step.parts && <span className="clipboard-parts">{step.parts.map(([name, ok]) => <i key={name} className={ok ? 'ok' : ''}>{ok ? '☑' : '☐'} {name}</i>)}</span>}{step.next && <small>{step.how}</small>}</div><em>{step.id === 'load' && step.status === 'active' ? `LOADING ${step.percent}%` : PAD_STATUS[step.status]}</em></li>)}</ol>
+        <footer>Do each step on the launch pad itself. This sheet fills in on its own.</footer>
+      </div>
+    </aside>
     <div className="pad-centre">
-      <div data-scene-window className={`pad-monitor-dropzone ${dropActive ? 'ready' : ''}`} onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }} onDragLeave={() => setDropActive(false)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }} onDrop={dropEquipment}><p className="dropzone-caption"><span>MAIN LAUNCH MONITOR</span>{dropMessage || 'Click the steps on the left, or drag a “drag” button onto this monitor.'}</p></div>
-      {state.pad.propellantStartedAt !== null && !state.pad.propellantLoaded && <div className="progress-wrap"><div><span>SIMULATED LOADING</span><b>{Math.min(100, Math.floor((state.elapsed - state.pad.propellantStartedAt) / PROPELLANT_LOAD_SECONDS * 100))}%</b></div><progress max="100" value={Math.min(100, (state.elapsed - state.pad.propellantStartedAt) / PROPELLANT_LOAD_SECONDS * 100)} /></div>}
-      <p className="stage-caveat">These are simplified training procedures. Scenario weather is deterministic game data, not a live forecast.</p>
+      <div className="pad-scene-window" data-scene-window aria-hidden="true" />
+      <div className="pad-status-strip">
+        <p className="pad-hint" role="status"><b>{pad.feedback ? 'PAD CREW' : 'NEXT'}</b>{pad.feedback || nextStep?.how || 'Pad procedure complete. Finish the range checks on the right, then begin the countdown.'}</p>
+        <div className="pad-keyboard-actions" role="group" aria-label="Keyboard controls for the launch pad equipment">
+          <span>KEYBOARD CONTROLS</span>
+          <Button onClick={() => dispatch({ type: pad.platformExtended ? 'RETRACT_PLATFORM' : 'EXTEND_PLATFORM' })} disabled={pad.platformRetracted}>{pad.platformExtended ? 'Retract access platform' : 'Extend access platform'}</Button>
+          <Button onClick={() => dispatch({ type: 'TOGGLE_PROPELLANT_LINE', line: 'fuel' })} disabled={pad.fuelConnected}>Connect fuel line</Button>
+          <Button onClick={() => dispatch({ type: 'TOGGLE_PROPELLANT_LINE', line: 'oxidizer' })} disabled={pad.oxidizerConnected}>Connect oxidiser line</Button>
+          <Button onClick={() => dispatch({ type: 'START_PROPELLANT_LOADING' })} disabled={pad.propellantStartedAt !== null}>Open loading valve</Button>
+          <Button onClick={() => dispatch({ type: 'CHECK_PAD_ITEM', key: 'vehicle' })} disabled={pad.checks.vehicle}>Inspect vehicle</Button>
+          <Button onClick={() => dispatch({ type: 'CHECK_PAD_ITEM', key: 'spacecraft' })} disabled={pad.checks.spacecraft}>Inspect spacecraft</Button>
+          <Button onClick={() => dispatch({ type: 'SWITCH_ONBOARD_POWER' })} disabled={pad.onboardPower}>Switch to onboard power</Button>
+        </div>
+        <p className="stage-caveat">Simplified training procedure on a schematic pad. Scenario weather is fixed game data, not a live forecast.</p>
+      </div>
     </div>
     <div className="window-review"><span className="eyebrow">RANGE WEATHER · FIXED SCENARIO DATA</span><h3>Inspect the weather</h3><p>One training condition on the mission clock: upper-level winds start above limits and ease {Math.ceil(weather.remaining) > 0 ? `in about ${Math.ceil(weather.remaining)} mission seconds` : 'early in pad preparation'}. It is not a forecast.</p>
         <div className="weather-meter"><span>UPPER-LEVEL WIND</span><b>{weather.clear ? 'WITHIN LIMITS · SUITABLE' : `ABOVE LIMITS · EASES IN ${Math.ceil(weather.remaining)} S`}</b><i className={weather.clear ? '' : 'caution'} /></div>
         <div className="inline-actions weather-choice"><Button onClick={() => dispatch({ type: 'ASSESS_WEATHER' })} disabled={state.pad.weatherAssessed}>{state.pad.weatherAssessed ? 'Weather inspected ✓' : 'Inspect weather'}</Button><Button onClick={() => dispatch({ type: 'CHECK_PAD_ITEM', key: 'site' })} disabled={state.pad.checks.site}>{state.pad.checks.site ? 'Launch site ✓' : 'Complete launch-site check'}</Button></div>
         <div className="go-lights">{statuses.map((item) => <div key={item.name}><i className={item.go ? 'on' : ''} /><b>{item.name}</b><span>{item.go ? 'GO' : 'WAIT'}</span></div>)}</div>
-        {state.pad.feedback && <p className="feedback" role="status">{state.pad.feedback}</p>}
         <Button className="primary-action" disabled={!readiness.canLaunch} onClick={() => dispatch({ type: 'START_COUNTDOWN' })}>{readiness.allGo ? 'Begin terminal countdown' : 'Get all three lights green to continue'}</Button>
     </div>
   </section>;
@@ -147,7 +144,7 @@ function GamePage() {
   return <main className={`game-page lunar-game game-phase-${state.phase}`}>
     {showGuide && <GameGuide onClose={closeGuide} />}
     {debugMenu}
-    {usesMissionScene && <Suspense fallback={<div className="mission-scene-background scene-loading" aria-hidden="true" />}><MissionScene3D phase={state.phase} elapsed={state.elapsed} installedParts={state.installedParts} pad={state.pad} ascent={state.ascent} landing={state.landing} transitElapsed={transitElapsed} assembly={assemblyUi} onInstall={assemblyActions.install} onSelectPart={assemblyActions.select} onHoverPart={assemblyActions.hover} onDragPart={assemblyActions.drag} onMiss={assemblyActions.miss} onLayout={onAssemblyLayout} /></Suspense>}
+    {usesMissionScene && <Suspense fallback={<div className="mission-scene-background scene-loading" aria-hidden="true" />}><MissionScene3D phase={state.phase} elapsed={state.elapsed} installedParts={state.installedParts} pad={state.pad} ascent={state.ascent} landing={state.landing} transitElapsed={transitElapsed} assembly={assemblyUi} onInstall={assemblyActions.install} onSelectPart={assemblyActions.select} onHoverPart={assemblyActions.hover} onDragPart={assemblyActions.drag} onMiss={assemblyActions.miss} onLayout={onAssemblyLayout} onPadAction={dispatch} /></Suspense>}
     <MissionHeader state={state} onTogglePause={() => dispatch({ type: 'TOGGLE_PAUSE' })} onSpeed={(speed) => dispatch({ type: 'SET_SPEED', speed })} onGuide={openGuide} />
     <StageProgress phase={state.phase} />
     <div className="phase-heading"><div><span className="eyebrow">{info[0]}</span><h2>{info[1]}</h2><p>{info[2]}</p></div></div>

@@ -155,7 +155,8 @@ function addAssemblyRig(scene) {
 }
 
 // Control room for the launch pad and the countdown. The wall monitor is a labelled
-// schematic of the pad, not a live or photorealistic feed.
+// schematic of the pad, not a live or photorealistic feed. During launch preparation the
+// player works the pad equipment on it by hand (see `interact`).
 function addPadRoom(scene) {
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 22), material(0x121825, { roughness: 0.95 }));
   floor.rotation.x = -Math.PI / 2;
@@ -201,32 +202,47 @@ function addPadRoom(scene) {
   for (const id of STACK_ORDER) makePart(id, rocket).position.y = partSlots[id] - STACK_BASE;
   const heightOf = (id) => 2.17 + (partSlots[id] - STACK_BASE) * 0.5;
 
-  // Access platform: grows from the tower towards the vehicle.
+  // Everything below is worked by hand on the monitor: the player drags or clicks the
+  // object itself, and the scene sends the matching action to the one mission reducer.
+  // What each object shows always comes from pad state, never from the gesture.
+  const TOWER_X = -1.38;
+  const FRONT = -5.88; // just in front of the vehicle, so handles are never hidden behind it
+  const PLATFORM = { rest: 1.1, extended: 2.17, retracted: 0.32 };
+
+  // Access platform: grows from the tower towards the vehicle. Its tip is the grip.
   const platformGeometry = new THREE.BoxGeometry(1, 0.1, 0.16);
   platformGeometry.translate(0.5, 0, 0);
   const platformY = heightOf('payload-adapter') + 0.05;
-  const platform = place(new THREE.Mesh(platformGeometry, material(0xfbbf24, { emissive: 0x4a3108 })), -1.38, platformY, Z + 0.02);
-  platform.scale.x = 1.1;
+  const platform = place(new THREE.Mesh(platformGeometry, material(0xfbbf24, { emissive: 0x4a3108 })), TOWER_X, platformY, Z + 0.02);
+  platform.scale.x = PLATFORM.rest;
+  const platformGrip = place(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.2), material(0xfde68a, { emissive: 0x6b4a0c })), TOWER_X + PLATFORM.rest, platformY, Z + 0.04);
 
-  // Fuel and oxidiser lines run from the tower to the tank they fill. A line that is
-  // not connected hangs loose from the tower.
-  const makeLine = (fromY, toX, toY, color, emissive) => {
-    const from = new THREE.Vector3(-1.38, fromY, Z);
+  // Fuel and oxidiser lines run from the tower to the tank they fill. A line that is not
+  // connected hangs loose from the tower with a nozzle the player can pick up.
+  const makeLine = (fromY, toX, toY, color, emissive, looseColor) => {
+    const from = new THREE.Vector3(TOWER_X, fromY, Z);
+    const port = new THREE.Vector3(toX, toY, FRONT);
+    const end = new THREE.Vector3(-0.95, fromY - 0.62, Z);
     const joined = new THREE.Mesh(
-      new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(from, new THREE.Vector3((toX - 1.38) / 2, Math.min(fromY, toY) - 0.5, Z + 0.05), new THREE.Vector3(toX, toY, Z + 0.08)), 30, 0.05, 8),
+      new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(from, new THREE.Vector3((toX + TOWER_X) / 2, Math.min(fromY, toY) - 0.5, Z + 0.05), new THREE.Vector3(toX, toY, Z + 0.08)), 30, 0.05, 8),
       material(color, { emissive }),
     );
     const loose = new THREE.Mesh(
-      new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(from, new THREE.Vector3(-0.92, fromY - 0.02, Z), new THREE.Vector3(-0.95, fromY - 0.62, Z)), 20, 0.05, 8),
-      material(0x566278),
+      new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(from, new THREE.Vector3(-0.92, fromY - 0.02, Z), end), 20, 0.05, 8),
+      material(looseColor),
     );
-    scene.add(joined, loose);
-    return { joined, loose };
+    const dragged = new THREE.Mesh(new THREE.BufferGeometry(), material(color, { emissive }));
+    dragged.visible = false;
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.07, 0.22, 12), material(color, { emissive }));
+    const portRing = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.03, 8, 24), new THREE.MeshBasicMaterial({ color, toneMapped: false }));
+    portRing.position.copy(port);
+    scene.add(joined, loose, dragged, nozzle, portRing);
+    return { joined, loose, dragged, nozzle, portRing, from, port, end, color, builtAt: '' };
   };
   const fuelY = heightOf('first-tank');
   const oxidiserY = heightOf('upper-tank') - 0.15;
-  const fuelLine = makeLine(fuelY - 0.1, 1.1 - 0.2, fuelY, 0xfbbf24, 0x4a3108);
-  const oxidiserLine = makeLine(oxidiserY - 0.1, 1.1 - 0.17, oxidiserY, 0x66b2ff, 0x102b49);
+  const fuelLine = makeLine(fuelY - 0.1, 1.1 - 0.2, fuelY, 0xfbbf24, 0x4a3108, 0x8a6a1c);
+  const oxidiserLine = makeLine(oxidiserY - 0.1, 1.1 - 0.17, oxidiserY, 0x66b2ff, 0x102b49, 0x35618f);
 
   // Tags, each joined to the tower by a short leader line.
   const callout = (y) => {
@@ -237,33 +253,209 @@ function addPadRoom(scene) {
   const oxidiserTag = callout(oxidiserY - 0.1);
   const platformTag = callout(platformY);
 
-  // Status column on the right of the monitor.
-  const propellantTag = place(makeLabel('', { height: 0.3 }), 3.95, 5.05);
-  box(scene, [3.95, 4.6, Z], [2.2, 0.2, 0.03], 0x1c2536);
+  // Status column on the right of the monitor, with the loading valve and the power switch.
+  const COLUMN_X = 4.25;
+  const propellantTag = place(makeLabel('', { height: 0.3 }), COLUMN_X, 5.95);
+  box(scene, [COLUMN_X, 5.5, Z], [2.2, 0.2, 0.03], 0x1c2536);
   const gaugeGeometry = new THREE.BoxGeometry(1, 0.12, 0.04);
   gaugeGeometry.translate(0.5, 0, 0);
-  const gauge = place(new THREE.Mesh(gaugeGeometry, new THREE.MeshBasicMaterial({ color: 0xfbbf24 })), 2.89, 4.6, Z + 0.02);
-  const powerTag = place(makeLabel('', { height: 0.3 }), 3.95, 3.9);
-  const countTag = place(makeLabel('TERMINAL COUNT', { height: 0.3, color: '#fb7185' }), 3.95, 3.2);
+  const gauge = place(new THREE.Mesh(gaugeGeometry, new THREE.MeshBasicMaterial({ color: 0xfbbf24 })), COLUMN_X - 1.06, 5.5, Z + 0.02);
+  const VALVE = { left: COLUMN_X - 0.7, right: COLUMN_X + 0.7, y: 4.95 };
+  box(scene, [COLUMN_X, VALVE.y, Z], [1.75, 0.1, 0.03], 0x33425a);
+  const valveKnob = place(new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.38, 0.12), material(0xfbbf24, { emissive: 0x4a3108 })), VALVE.left, VALVE.y, Z + 0.06);
+  const valveTag = place(makeLabel('', { height: 0.2 }), COLUMN_X, 4.52);
+  const powerTag = place(makeLabel('', { height: 0.3 }), COLUMN_X, 3.72);
+  const SWITCH = { left: COLUMN_X - 0.42, right: COLUMN_X + 0.42, y: 3.17 };
+  box(scene, [COLUMN_X, SWITCH.y, Z], [1.2, 0.24, 0.03], 0x33425a);
+  const switchKnob = place(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.36, 0.12), material(0x94a3b8, { emissive: 0x1c2536 })), SWITCH.left, SWITCH.y, Z + 0.06);
+  const switchTag = place(makeLabel('', { height: 0.2 }), COLUMN_X, 2.76);
+  const countTag = place(makeLabel('TERMINAL COUNT', { height: 0.3, color: '#fb7185' }), COLUMN_X, 2.3);
+
+  // Inspection points: a ring on the vehicle and a tag beside it. A finished check plays a scan.
+  const makeInspection = (y, low, high, tagX) => {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.028, 8, 28), new THREE.MeshBasicMaterial({ color: 0x4cc9f0, toneMapped: false }));
+    ring.position.set(1.1, y, FRONT);
+    const scan = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.035, 0.02), new THREE.MeshBasicMaterial({ color: 0x6ee7b7, toneMapped: false }));
+    scan.position.set(1.1, low, FRONT);
+    scan.visible = false;
+    scene.add(ring, scan);
+    return { ring, scan, tag: place(makeLabel('', { height: 0.19 }), tagX, y, Z + 0.02), y, low, high, tagX, was: null, scanAt: -10 };
+  };
+  const vehicleCheck = makeInspection(2.72, 2.2, 4.75, 2.2);
+  const spacecraftCheck = makeInspection(5.5, 4.85, 6.1, 2.3);
+
+  // A halo marks what can be worked next, what the pointer is over, and (in red) an attempt that was refused.
+  const HANDLES = ['platform', 'fuel', 'oxidiser', 'valve', 'power', 'vehicle', 'spacecraft'];
+  const halos = Object.fromEntries(HANDLES.map((id) => {
+    const halo = new THREE.Mesh(new THREE.RingGeometry(0.27, 0.33, 32), new THREE.MeshBasicMaterial({ color: 0x4cc9f0, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    halo.position.z = FRONT + 0.02;
+    scene.add(halo);
+    return [id, halo];
+  }));
+
+  let held = null; // the object in the player's hand: { id, moved, x, y, scale, t, offset }
+  let hoverId = null;
+  let attempt = null; // the last release, kept briefly to flash red if the reducer refused it
+  let clock = 0;
+  const hasStarted = (pad) => pad.propellantStartedAt !== null && pad.propellantStartedAt !== undefined;
+  const padKey = (pad) => [pad.platformExtended, pad.platformRetracted, pad.fuelConnected, pad.oxidizerConnected, hasStarted(pad), pad.checks?.vehicle, pad.checks?.spacecraft, pad.onboardPower].join();
+  const handleAt = (id) => {
+    if (id === 'platform') return [TOWER_X + platform.scale.x, platformY];
+    if (id === 'fuel') return [fuelLine.nozzle.position.x, fuelLine.nozzle.position.y];
+    if (id === 'oxidiser') return [oxidiserLine.nozzle.position.x, oxidiserLine.nozzle.position.y];
+    if (id === 'valve') return [valveKnob.position.x, VALVE.y];
+    if (id === 'power') return [switchKnob.position.x, SWITCH.y];
+    return [1.1, id === 'vehicle' ? vehicleCheck.y : spacecraftCheck.y];
+  };
+  // Which objects the procedure is waiting on right now.
+  const nextIds = (pad) => {
+    if (!pad.platformExtended && !pad.platformRetracted) return ['platform'];
+    if (!hasStarted(pad)) {
+      const lines = [!pad.fuelConnected && 'fuel', !pad.oxidizerConnected && 'oxidiser'].filter(Boolean);
+      return lines.length ? lines : ['valve'];
+    }
+    const checks = [pad.propellantLoaded && !pad.checks?.vehicle && 'vehicle', !pad.checks?.spacecraft && 'spacecraft'].filter(Boolean);
+    if (checks.length || !pad.propellantLoaded) return checks;
+    if (!pad.platformRetracted) return ['platform'];
+    return pad.onboardPower ? [] : ['power'];
+  };
+
+  const interact = {
+    plane: new THREE.Plane(new THREE.Vector3(0, 0, 1), -(Z + 0.05)),
+    // Which object, if any, is under a point on the monitor. Finished objects cannot be picked up again.
+    pick(point, pad = {}) {
+      const near = (x, y, rx, ry = rx) => Math.abs(point.x - x) <= rx && Math.abs(point.y - y) <= ry;
+      if (!pad.checks?.spacecraft && (near(1.1, spacecraftCheck.y, 0.34) || near(spacecraftCheck.tagX, spacecraftCheck.y, 0.75, 0.16))) return 'spacecraft';
+      if (!pad.checks?.vehicle && (near(1.1, vehicleCheck.y, 0.34) || near(vehicleCheck.tagX, vehicleCheck.y, 0.7, 0.16))) return 'vehicle';
+      if (!pad.platformRetracted && point.x >= TOWER_X - 0.05 && point.x <= TOWER_X + platform.scale.x + 0.3 && Math.abs(point.y - platformY) <= 0.26) return 'platform';
+      if (!pad.fuelConnected && near(fuelLine.end.x, fuelLine.end.y - 0.05, 0.36)) return 'fuel';
+      if (!pad.oxidizerConnected && near(oxidiserLine.end.x, oxidiserLine.end.y - 0.05, 0.36)) return 'oxidiser';
+      if (!hasStarted(pad) && near(COLUMN_X, VALVE.y, 0.95, 0.3)) return 'valve';
+      if (!pad.onboardPower && near(COLUMN_X, SWITCH.y, 0.75, 0.3)) return 'power';
+      return null;
+    },
+    cursor: (id) => (id === 'vehicle' || id === 'spacecraft' ? 'pointer' : 'grab'),
+    hover(id) { hoverId = id; },
+    grab(id, point) {
+      held = { id, moved: false, x: point.x, y: point.y, offset: point.x - (TOWER_X + platform.scale.x), scale: platform.scale.x, t: 0 };
+    },
+    drag(point) {
+      if (!held) return;
+      held.moved = true;
+      held.x = clamp(point.x, -4.2, 5.4);
+      held.y = clamp(point.y, 2.1, 7);
+      held.scale = clamp(point.x - held.offset - TOWER_X, PLATFORM.retracted, PLATFORM.extended);
+      const track = held.id === 'valve' ? VALVE : SWITCH;
+      held.t = clamp((point.x - track.left) / (track.right - track.left), 0, 1);
+    },
+    // Letting go decides what was attempted. The reducer decides whether it is allowed.
+    release(pad = {}, cancelled = false) {
+      const done = held;
+      held = null;
+      if (!done || cancelled) return [];
+      const say = (message) => ({ type: 'PAD_FEEDBACK', message });
+      let actions = [];
+      if (done.id === 'platform') {
+        if (!pad.platformExtended) actions = !done.moved || done.scale >= 1.7 ? [{ type: 'EXTEND_PLATFORM' }] : [say('Not far enough. Drag the access platform all the way across to the vehicle.')];
+        else actions = !done.moved || done.scale <= 1.2 ? [{ type: 'RETRACT_PLATFORM' }] : [];
+      } else if (done.id === 'fuel' || done.id === 'oxidiser') {
+        const isFuel = done.id === 'fuel';
+        const own = isFuel ? fuelLine : oxidiserLine;
+        const other = isFuel ? oxidiserLine : fuelLine;
+        const name = isFuel ? 'fuel' : 'oxidiser';
+        const reaches = (line) => Math.hypot(done.x - line.port.x, done.y - line.port.y) < 0.5;
+        if (!done.moved) actions = [say(`Pick up the ${name} hose end and drag it across to the ${isFuel ? 'amber' : 'blue'} port on the vehicle.`)];
+        else if (reaches(own)) actions = [{ type: 'TOGGLE_PROPELLANT_LINE', line: isFuel ? 'fuel' : 'oxidizer' }];
+        else if (reaches(other)) actions = [say(`Wrong port. That is the ${isFuel ? 'oxidiser' : 'fuel'} port; the ${name} line goes to the ${isFuel ? 'amber port on the lower tank' : 'blue port on the upper tank'}.`)];
+        else actions = [say(`The ${name} line was not attached. Drop the hose end on the port ringed in the same colour.`)];
+      } else if (done.id === 'valve') actions = !done.moved || done.t >= 0.6 ? [{ type: 'START_PROPELLANT_LOADING' }] : [];
+      else if (done.id === 'power') actions = !done.moved || done.t >= 0.6 ? [{ type: 'SWITCH_ONBOARD_POWER' }] : [];
+      else actions = [{ type: 'CHECK_PAD_ITEM', key: done.id }];
+      attempt = { id: done.id, until: clock + 0.8, key: padKey(pad) };
+      return actions;
+    },
+    // Monitor positions of every handle and target, for tests and pointer tooling.
+    points: () => ({ platform: handleAt('platform'), platformExtended: [TOWER_X + PLATFORM.extended, platformY], platformRetracted: [TOWER_X + PLATFORM.retracted, platformY], fuel: [fuelLine.end.x, fuelLine.end.y - 0.05], oxidiser: [oxidiserLine.end.x, oxidiserLine.end.y - 0.05], fuelPort: [fuelLine.port.x, fuelLine.port.y], oxidiserPort: [oxidiserLine.port.x, oxidiserLine.port.y], valve: [VALVE.left, VALVE.y], valveOpen: [VALVE.right, VALVE.y], power: [SWITCH.left, SWITCH.y], powerOn: [SWITCH.right, SWITCH.y], vehicle: [1.1, vehicleCheck.y], spacecraft: [1.1, spacecraftCheck.y], depth: FRONT }),
+  };
 
   return {
+    interact,
     update(current, dt, seconds) {
+      clock = seconds;
       const pad = current.pad || {};
-      platform.scale.x = damp(platform.scale.x, pad.platformRetracted ? 0.32 : pad.platformExtended ? 2.17 : 1.1, 4, dt);
+      const live = current.phase === 'launchpad';
+      if (!live) { held = null; hoverId = null; }
+      const inHand = held?.moved ? held : null;
+
+      const platformTarget = inHand?.id === 'platform' ? inHand.scale : pad.platformRetracted ? PLATFORM.retracted : pad.platformExtended ? PLATFORM.extended : PLATFORM.rest;
+      platform.scale.x = damp(platform.scale.x, platformTarget, inHand?.id === 'platform' ? 30 : 6, dt);
+      platformGrip.position.x = TOWER_X + platform.scale.x;
       platformTag.userData.setLabel(pad.platformRetracted ? 'PLATFORM CLEAR ✓' : pad.platformExtended ? 'ACCESS PLATFORM ✓' : 'ACCESS PLATFORM', pad.platformRetracted ? '#6ee7b7' : pad.platformExtended ? '#fbbf24' : GREY);
-      fuelLine.joined.visible = Boolean(pad.fuelConnected);
-      fuelLine.loose.visible = !pad.fuelConnected;
-      fuelTag.userData.setLabel(pad.fuelConnected ? 'FUEL LINE ✓' : 'FUEL LINE', pad.fuelConnected ? '#fbbf24' : GREY);
-      oxidiserLine.joined.visible = Boolean(pad.oxidizerConnected);
-      oxidiserLine.loose.visible = !pad.oxidizerConnected;
-      oxidiserTag.userData.setLabel(pad.oxidizerConnected ? 'OXIDISER LINE ✓' : 'OXIDISER LINE', pad.oxidizerConnected ? '#66b2ff' : GREY);
+
+      for (const [id, line, connected, tag, name, colour] of [['fuel', fuelLine, pad.fuelConnected, fuelTag, 'FUEL LINE', '#fbbf24'], ['oxidiser', oxidiserLine, pad.oxidizerConnected, oxidiserTag, 'OXIDISER LINE', '#66b2ff']]) {
+        const carried = !connected && inHand?.id === id;
+        line.joined.visible = Boolean(connected);
+        line.loose.visible = !connected && !carried;
+        line.dragged.visible = carried;
+        line.nozzle.visible = !connected;
+        if (carried) {
+          const key = `${inHand.x.toFixed(2)},${inHand.y.toFixed(2)}`;
+          if (key !== line.builtAt) {
+            line.builtAt = key;
+            line.dragged.geometry.dispose();
+            line.dragged.geometry = new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(line.from, new THREE.Vector3((line.from.x + inHand.x) / 2, Math.min(line.from.y, inHand.y) - 0.45, FRONT), new THREE.Vector3(inHand.x, inHand.y, FRONT)), 18, 0.05, 6);
+          }
+          line.nozzle.position.set(inHand.x, inHand.y, FRONT);
+        } else line.nozzle.position.set(line.end.x, line.end.y - 0.06, Z + 0.06);
+        const reachable = carried && Math.hypot(inHand.x - line.port.x, inHand.y - line.port.y) < 0.5;
+        line.portRing.visible = !connected;
+        line.portRing.scale.setScalar(reachable ? 1.6 : carried ? 1.2 + Math.sin(seconds * 7) * 0.12 : 1);
+        line.portRing.material.color.set(reachable ? 0x6ee7b7 : line.color);
+        tag.userData.setLabel(connected ? `${name} ✓` : name, connected ? colour : GREY);
+      }
+
       const started = pad.propellantStartedAt;
-      const loading = started !== null && started !== undefined;
+      const loading = hasStarted(pad);
       const filled = pad.propellantLoaded ? 1 : loading ? clamp((current.elapsed - started) / PROPELLANT_LOAD_SECONDS, 0, 1) : 0;
       gauge.scale.x = Math.max(0.001, filled * 2.12);
       gauge.material.color.set(pad.propellantLoaded ? 0x6ee7b7 : 0xfbbf24);
       propellantTag.userData.setLabel(pad.propellantLoaded ? 'PROPELLANT · LOADED ✓' : loading ? `PROPELLANT · ${Math.floor(filled * 100)}%` : 'PROPELLANT · EMPTY', pad.propellantLoaded ? '#6ee7b7' : loading ? '#fbbf24' : GREY);
+      valveKnob.position.x = damp(valveKnob.position.x, loading ? VALVE.right : inHand?.id === 'valve' ? lerp(VALVE.left, VALVE.right, inHand.t) : VALVE.left, 18, dt);
+      valveKnob.material.color.set(loading ? 0x6ee7b7 : 0xfbbf24);
+      valveTag.userData.setLabel(loading ? 'LOADING VALVE · OPEN' : 'LOADING VALVE · SHUT', loading ? '#6ee7b7' : GREY);
+      switchKnob.position.x = damp(switchKnob.position.x, pad.onboardPower ? SWITCH.right : inHand?.id === 'power' ? lerp(SWITCH.left, SWITCH.right, inHand.t) : SWITCH.left, 18, dt);
+      switchKnob.material.color.set(pad.onboardPower ? 0x6ee7b7 : 0x94a3b8);
+      switchTag.userData.setLabel('GROUND ◂ ▸ ONBOARD', pad.onboardPower ? '#6ee7b7' : GREY);
       powerTag.userData.setLabel(pad.onboardPower ? 'POWER · ONBOARD ✓' : 'POWER · GROUND', pad.onboardPower ? '#6ee7b7' : GREY);
+
+      for (const [key, item, label] of [['vehicle', vehicleCheck, 'VEHICLE'], ['spacecraft', spacecraftCheck, 'SPACECRAFT']]) {
+        const checked = Boolean(pad.checks?.[key]);
+        if (item.was === false && checked) item.scanAt = seconds;
+        item.was = checked;
+        const scanning = seconds - item.scanAt < 1.4;
+        item.scan.visible = scanning;
+        if (scanning) item.scan.position.y = lerp(item.low, item.high, ((seconds - item.scanAt) / 0.7) % 1);
+        item.ring.material.color.set(checked ? 0x6ee7b7 : 0x4cc9f0);
+        item.tag.userData.setLabel(scanning ? `SCANNING ${label}` : checked ? `${label} CHECKED ✓` : `INSPECT ${label}`, checked ? '#6ee7b7' : '#7fd8f2');
+      }
+
+      if (attempt && (seconds > attempt.until || attempt.key !== padKey(pad))) attempt = null;
+      const suggested = live ? nextIds(pad) : [];
+      for (const id of HANDLES) {
+        const halo = halos[id];
+        const [x, y] = handleAt(id);
+        halo.position.x = x;
+        halo.position.y = y;
+        const finished = id === 'platform' ? pad.platformRetracted : id === 'fuel' ? pad.fuelConnected : id === 'oxidiser' ? pad.oxidizerConnected : id === 'valve' ? hasStarted(pad) : id === 'power' ? pad.onboardPower : pad.checks?.[id];
+        const refused = !finished && attempt?.id === id;
+        const active = !finished && (hoverId === id || held?.id === id);
+        const pulse = Math.sin(seconds * 4);
+        const opacity = !live ? 0 : refused ? 0.95 : active ? 0.9 : suggested.includes(id) ? 0.42 + pulse * 0.25 : 0;
+        halo.material.opacity = damp(halo.material.opacity, opacity, 14, dt);
+        halo.material.color.set(refused ? 0xfb7185 : 0x4cc9f0);
+        halo.scale.setScalar(active ? 1.18 : 1 + pulse * 0.07);
+      }
+
       const counting = current.phase === 'countdown';
       const blink = Math.sin(seconds * 6) > 0;
       countTag.visible = counting && blink;
@@ -565,7 +757,7 @@ function addLandingScene(scene) {
   };
 }
 
-export default function MissionScene3D({ phase, elapsed, installedParts = [], pad, ascent, landing, transitElapsed = 0, assembly, onInstall, onSelectPart, onHoverPart, onDragPart, onMiss, onLayout }) {
+export default function MissionScene3D({ phase, elapsed, installedParts = [], pad, ascent, landing, transitElapsed = 0, assembly, onInstall, onSelectPart, onHoverPart, onDragPart, onMiss, onLayout, onPadAction }) {
   const mountRef = useRef(null);
   const frameState = useRef({});
   // Stages that share a setting keep one scene: the hangar while the last part settles,
@@ -573,8 +765,8 @@ export default function MissionScene3D({ phase, elapsed, installedParts = [], pa
   const sceneKind = SCENE_KIND[phase] || 'assembly';
 
   useEffect(() => {
-    frameState.current = { phase, elapsed, installedParts, pad, ascent, landing, transitElapsed, assembly, onInstall, onSelectPart, onHoverPart, onDragPart, onMiss, onLayout };
-  }, [phase, elapsed, installedParts, pad, ascent, landing, transitElapsed, assembly, onInstall, onSelectPart, onHoverPart, onDragPart, onMiss, onLayout]);
+    frameState.current = { phase, elapsed, installedParts, pad, ascent, landing, transitElapsed, assembly, onInstall, onSelectPart, onHoverPart, onDragPart, onMiss, onLayout, onPadAction };
+  }, [phase, elapsed, installedParts, pad, ascent, landing, transitElapsed, assembly, onInstall, onSelectPart, onHoverPart, onDragPart, onMiss, onLayout, onPadAction]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -683,12 +875,12 @@ export default function MissionScene3D({ phase, elapsed, installedParts = [], pa
     let hoverPart = null;
     let hoverSlot = null;
     const installedNow = () => callbacks().installedParts || [];
-    const planePoint = (event) => {
+    const planePoint = (event, plane = dragPlane) => {
       const rect = canvas.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      return raycaster.ray.intersectPlane(dragPlane, new THREE.Vector3());
+      return raycaster.ray.intersectPlane(plane, new THREE.Vector3());
     };
     const partAt = (point) => {
       const installed = installedNow();
@@ -786,6 +978,62 @@ export default function MissionScene3D({ phase, elapsed, installedParts = [], pa
       canvas.addEventListener('pointerleave', onPointerLeave);
     }
 
+    // Launch pad: the player picks up and works the pad equipment on the wall monitor.
+    const padTools = stage?.interact || null;
+    let padGrab = null;
+    const onPadDown = (event) => {
+      const current = callbacks();
+      if (event.button !== 0 || current.phase !== 'launchpad') return;
+      const point = planePoint(event, padTools.plane);
+      const id = point && padTools.pick(point, current.pad);
+      if (!id) return;
+      padGrab = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, moved: false };
+      padTools.grab(id, point);
+      canvas.setPointerCapture?.(event.pointerId);
+      canvas.style.cursor = padTools.cursor(id) === 'grab' ? 'grabbing' : 'pointer';
+      event.preventDefault();
+    };
+    const onPadMove = (event) => {
+      const current = callbacks();
+      const point = planePoint(event, padTools.plane);
+      if (padGrab) {
+        if (!padGrab.moved && Math.hypot(event.clientX - padGrab.startX, event.clientY - padGrab.startY) > 6) padGrab.moved = true;
+        if (padGrab.moved && point) padTools.drag(point);
+        return;
+      }
+      const id = current.phase === 'launchpad' && point ? padTools.pick(point, current.pad) : null;
+      padTools.hover(id);
+      canvas.style.cursor = id ? padTools.cursor(id) : 'default';
+    };
+    const onPadUp = (event) => {
+      if (!padGrab || event.pointerId !== padGrab.pointerId) return;
+      padGrab = null;
+      canvas.releasePointerCapture?.(event.pointerId);
+      const current = callbacks();
+      for (const action of padTools.release(current.pad, event.type === 'pointercancel')) current.onPadAction?.(action);
+      canvas.style.cursor = 'default';
+    };
+    const onPadLeave = () => { if (!padGrab) { padTools.hover(null); canvas.style.cursor = 'default'; } };
+    // Where each handle sits on screen, published on the mount for tests and pointer tooling.
+    const reportPadPoints = () => {
+      const rect = canvas.getBoundingClientRect();
+      const { depth, ...points } = padTools.points();
+      const screen = {};
+      for (const [id, [x, y]] of Object.entries(points)) {
+        projected.set(x, y, depth).project(camera);
+        screen[id] = [Math.round(rect.left + (projected.x + 1) / 2 * rect.width), Math.round(rect.top + (1 - projected.y) / 2 * rect.height)];
+      }
+      mount.dataset.padPoints = JSON.stringify(screen);
+    };
+    if (padTools) {
+      canvas.style.touchAction = 'none';
+      canvas.addEventListener('pointerdown', onPadDown);
+      canvas.addEventListener('pointermove', onPadMove);
+      canvas.addEventListener('pointerup', onPadUp);
+      canvas.addEventListener('pointercancel', onPadUp);
+      canvas.addEventListener('pointerleave', onPadLeave);
+    }
+
     const tint = new THREE.Color();
     const animateAssembly = (current, dt, seconds) => {
       const installed = current.installedParts || [];
@@ -851,7 +1099,7 @@ export default function MissionScene3D({ phase, elapsed, installedParts = [], pa
       lastTime = now;
       frameCount += 1;
       // Panels can open, close or resize without the canvas changing size.
-      if (frameCount % 12 === 0) updateView();
+      if (frameCount % 12 === 0) { updateView(); if (padTools) reportPadPoints(); }
       if (rig) animateAssembly(current, dt, now / 1000);
       if (stage) stage.update(current, dt, now / 1000);
       renderer.render(scene, camera);
@@ -868,6 +1116,11 @@ export default function MissionScene3D({ phase, elapsed, installedParts = [], pa
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerUp);
       canvas.removeEventListener('pointerleave', onPointerLeave);
+      canvas.removeEventListener('pointerdown', onPadDown);
+      canvas.removeEventListener('pointermove', onPadMove);
+      canvas.removeEventListener('pointerup', onPadUp);
+      canvas.removeEventListener('pointercancel', onPadUp);
+      canvas.removeEventListener('pointerleave', onPadLeave);
       if (rig) callbacks().onHoverPart?.(null);
       scene.traverse((object) => {
         if (object.geometry) object.geometry.dispose();

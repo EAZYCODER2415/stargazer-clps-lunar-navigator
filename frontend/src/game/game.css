@@ -37,9 +37,7 @@
 .lunar-game .rocket-engine { width:15px; height:14px; background:#e87943; clip-path:polygon(15% 0,85% 0,100% 100%,0 100%); }
 .lunar-game .pad-platform { position:absolute; z-index:3; left:47%; bottom:39%; width:0; height:4px; background:var(--game-gold); transition:width .3s; }.lunar-game .pad-platform.extended { width:14%; }
 .lunar-game .pad-columns { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr); gap:20px; }
-.lunar-game .pad-checklist, .lunar-game .window-review { padding:16px; border:1px solid var(--game-border); border-radius:6px; background:#0e131e; }
-.lunar-game .procedure-row { display:grid; grid-template-columns:28px minmax(120px,1fr) auto; align-items:center; gap:8px; padding:11px 0; border-bottom:1px solid #222b3b; }
-.lunar-game .procedure-row:last-child { border-bottom:0; }.lunar-game .procedure-row > b { color:var(--game-cyan); font:12px ui-monospace,monospace; }.lunar-game .procedure-row > span { color:var(--game-muted); font-size:11px; }
+.lunar-game .window-review { padding:16px; border:1px solid var(--game-border); border-radius:6px; background:#0e131e; }
 .lunar-game .inline-actions, .lunar-game .action-row { display:flex; flex-wrap:wrap; gap:7px; }
 .lunar-game .window-review h3 { margin:8px 0 5px; font-size:16px; }.lunar-game .window-review > p { color:var(--game-muted); font-size:11px; line-height:1.5; }
 .lunar-game .weather-meter { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:15px 0 10px; padding:10px; border:1px solid var(--game-border); border-radius:4px; background:#121a27; }.lunar-game .weather-meter span { color:var(--game-dim); font-size:9px; }.lunar-game .weather-meter b { font-size:10px; }.lunar-game .weather-meter i { width:8px; height:8px; border-radius:50%; background:var(--game-green); box-shadow:0 0 10px var(--game-green); }.lunar-game .weather-meter i.caution { background:var(--game-gold); box-shadow:0 0 10px var(--game-gold); }
@@ -61,7 +59,7 @@
 .lunar-game .guide-dialog { width:min(680px,100%); max-height:90vh; overflow:auto; padding:clamp(22px,5vw,42px); border:1px solid #35425a; border-radius:8px; background:#101622; box-shadow:0 25px 100px #000b; }
 .lunar-game .guide-dialog h2 { margin:8px 0 10px; font-size:clamp(24px,4vw,34px); line-height:1.15; }.lunar-game .guide-dialog p,.lunar-game .guide-dialog li { color:var(--game-muted); font-size:13px; line-height:1.65; }.lunar-game .guide-dialog ol { display:grid; gap:6px; padding-left:22px; }.lunar-game .guide-dialog li b { color:var(--game-text); }.lunar-game .guide-dialog .guide-caveat { padding:12px; border-left:2px solid var(--game-gold); background:#201c13; font-size:11px; }
 @media (max-width:850px) {.lunar-game .assembly-layout,.lunar-game .pad-columns { grid-template-columns:1fr; }.lunar-game .rocket-stack { min-height:380px; }.lunar-game .flight-schematic { grid-template-columns:55px 70px 1fr; gap:10px; }.lunar-game .parts-list { grid-template-columns:1fr 1fr; } }
-@media (max-width:560px) { .lunar-game { padding:12px 10px 26px; }.lunar-game .comms-list,.lunar-game .science-grid { grid-template-columns:1fr; }.lunar-game .phase-heading { align-items:flex-start; flex-direction:column; }.lunar-game .procedure-row { grid-template-columns:24px 1fr; }.lunar-game .procedure-row > :last-child { grid-column:2; justify-self:start; }.lunar-game .landing-grid { grid-template-columns:1fr; }.lunar-game .zone-card { min-height:80px; }.lunar-game .transit-data { grid-template-columns:1fr; } }
+@media (max-width:560px) { .lunar-game { padding:12px 10px 26px; }.lunar-game .comms-list,.lunar-game .science-grid { grid-template-columns:1fr; }.lunar-game .phase-heading { align-items:flex-start; flex-direction:column; }.lunar-game .landing-grid { grid-template-columns:1fr; }.lunar-game .zone-card { min-height:80px; }.lunar-game .transit-data { grid-template-columns:1fr; } }
 
 /* The committed mission remains a viewport game; each phase owns the space below its console header. */
 .lunar-game { box-sizing:border-box; position:fixed; z-index:15; inset:0; display:flex; flex-direction:column; gap:8px; width:100vw; height:100vh; height:100dvh; min-height:0; overflow:hidden; padding:10px 20px 14px; }
@@ -71,7 +69,7 @@
 .mission-scene-fallback { display:none; position:absolute; inset:0; place-items:center; color:#a8b2c4; background:radial-gradient(ellipse at 50% 40%,#172435,#070a11 72%); font-size:12px; }
 .mission-scene-background[data-unavailable="true"] .mission-scene-fallback { display:grid; }
 .lunar-game > .phase-heading,.lunar-game > .phase-panel { position:relative; z-index:1; }
-.lunar-game .mission-scene-background.scene-assembly canvas,.lunar-game .mission-scene-background.scene-assembly-complete canvas { pointer-events:auto; }
+.lunar-game .mission-scene-background.scene-assembly canvas,.lunar-game .mission-scene-background.scene-assembly-complete canvas,.lunar-game .mission-scene-background.scene-launchpad canvas { pointer-events:auto; }
 .lunar-game > .phase-heading { flex:0 0 auto; width:100%; max-width:none; margin:5px 0 0; }
 .lunar-game > .game-panel.phase-panel { flex:1 1 auto; width:100%; max-width:none; min-height:0; margin:0; overflow:auto; border:1px solid #30394d99; border-radius:4px; background:linear-gradient(120deg,#090c14e8,#111522df 55%,#0a0d15e8); box-shadow:inset 0 1px #ffffff08; }
 .lunar-game .lunar-scene-frame { height:clamp(220px,37vh,390px); }
@@ -95,13 +93,7 @@
   background:transparent;
   box-shadow:none;
 }
-.lunar-game .parts-panel,
-.lunar-game .pad-checklist,
-.lunar-game .window-review,
-.lunar-game .flight-readouts > div,
-.lunar-game .transit-data > div,
-.lunar-game .comms-question,
-.lunar-game .science-grid article {
+.lunar-game .parts-panel,.lunar-game .window-review,.lunar-game .flight-readouts > div,.lunar-game .transit-data > div,.lunar-game .comms-question,.lunar-game .science-grid article {
   border-color:#41516bbd;
   border-radius:3px;
   background:linear-gradient(135deg,#091420ed,#0a101bdc);
@@ -172,9 +164,7 @@
 .lunar-game .stage-split.stage-assembly { grid-template-columns:minmax(210px,250px) minmax(0,1fr) minmax(220px,270px); grid-template-rows:minmax(0,1fr); }
 .lunar-game .phase-panel.pad-phase { grid-template-columns:minmax(270px,320px) minmax(0,1fr) minmax(270px,320px); grid-template-rows:minmax(0,1fr); }
 .lunar-game .scene-window { min-width:0; min-height:0; }
-.lunar-game .stage-console,
-.lunar-game .pad-phase > .pad-checklist,
-.lunar-game .pad-phase > .window-review {
+.lunar-game .stage-console,.lunar-game .pad-phase > .window-review {
   min-width:0; min-height:0; max-height:100%; overflow:auto; padding:14px 16px; pointer-events:auto; scrollbar-width:thin; scrollbar-color:#3a4a60 transparent;
   border:1px solid #43536bbf; border-radius:5px; background:linear-gradient(120deg,#07101cf0,#0b1420e6 53%,#07101cee);
   box-shadow:inset 0 1px #ffffff12,0 14px 40px #0008; backdrop-filter:blur(10px);
@@ -216,17 +206,9 @@
 .lunar-game .part-hotspot:focus-visible .hotspot-label { opacity:1; }
 
 /* 02 Launch pad: procedure left, weather and GO lights right, launch monitor clear in the centre. */
-.lunar-game .pad-centre { display:grid; grid-template-rows:minmax(0,1fr) auto auto; gap:8px; min-width:0; min-height:0; }
-.lunar-game .pad-monitor-dropzone { position:relative; min-height:0; border:1px dashed transparent; border-radius:5px; pointer-events:auto; transition:background .15s,border-color .15s,box-shadow .15s; }
-.lunar-game .pad-monitor-dropzone.ready { border-color:var(--game-gold); background:#201b0a33; box-shadow:inset 0 0 35px #fbbf2414,0 0 24px #fbbf2418; }
-.lunar-game .dropzone-caption { position:absolute; left:50%; bottom:4px; width:max-content; max-width:96%; margin:0; padding:4px 10px; border:1px solid #3a4a60b8; border-radius:3px; color:#b8c7d9; background:#07101ce6; font-size:10px; text-align:center; transform:translateX(-50%); pointer-events:none; }
-.lunar-game .dropzone-caption span { margin-right:8px; color:var(--game-cyan); font-size:8px; font-weight:750; letter-spacing:.12em; }
+.lunar-game .pad-centre { display:grid; grid-template-rows:minmax(0,1fr) auto; gap:8px; min-width:0; min-height:0; }
 .lunar-game .pad-centre .progress-wrap { margin:0; padding:8px 10px; border:1px solid #394960; border-radius:3px; background:#0a101be8; pointer-events:auto; }
 .lunar-game .stage-caveat { margin:0; padding:6px 10px; border-left:2px solid var(--game-cyan); color:var(--game-muted); background:#09101bdc; font-size:10px; line-height:1.5; pointer-events:auto; }
-.lunar-game .pad-phase > .pad-checklist { padding:12px 14px; }
-.lunar-game .pad-phase .procedure-row { grid-template-columns:23px minmax(90px,1fr) auto; gap:7px; padding:8px 0; }
-.lunar-game .pad-phase .procedure-row > span { font-size:10px; }
-.lunar-game .pad-phase .procedure-row .game-button { padding:6px 8px; font-size:9px; }
 .lunar-game .pad-phase .inline-actions { gap:4px; }
 .lunar-game .pad-phase .window-review h3 { font-size:15px; }
 .lunar-game .pad-phase .window-review > p { font-size:10px; }
@@ -267,7 +249,6 @@
   .lunar-game .stage-assembly > .assembly-guide { max-height:22vh; }
   .lunar-game .phase-panel.pad-phase { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(30%,1fr) auto auto; }
   .lunar-game .pad-phase > .pad-centre { order:-1; }
-  .lunar-game .pad-phase > .pad-checklist,
   .lunar-game .pad-phase > .window-review { max-height:26vh; }
   .lunar-game .countdown-console { grid-template-columns:minmax(0,1fr); }
   .lunar-game .transit-console .comms-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -377,3 +358,53 @@
 .stage-debug-actions button.primary { border-color:#4cc9f0; background:#123142; }
 .stage-debug-window button:focus-visible { outline:2px solid #4cc9f0; outline-offset:2px; }
 @media (max-width:560px) { .stage-debug-window { padding:16px; } .stage-debug-options { grid-template-columns:1fr; } }
+
+/* 02 Launch pad: the procedure is a physical clipboard. It reports status only; every step
+   is done by hand on the launch pad in the 3D scene. */
+.lunar-game .pad-phase > .pad-clipboard {
+  position:relative; display:flex; flex-direction:column; align-self:start; min-width:0; min-height:0; max-height:100%; margin-top:8px; padding:24px 10px 10px;
+  border:1px solid #1b1510; border-radius:10px 10px 7px 7px; background:linear-gradient(160deg,#3b2f23,#2b2219 60%,#221a14);
+  box-shadow:inset 0 1px #ffffff14,inset 0 -2px #0006,0 16px 40px #000a; pointer-events:auto;
+}
+.lunar-game .clipboard-clip { position:absolute; z-index:1; top:-8px; left:50%; width:98px; height:30px; border:1px solid #6d7889; border-radius:6px 6px 3px 3px; background:linear-gradient(180deg,#c9d0da,#8a94a3 55%,#5d6675); box-shadow:0 3px 6px #0009,inset 0 1px #fff6; transform:translateX(-50%); }
+.lunar-game .clipboard-clip::after { content:""; position:absolute; top:7px; left:50%; width:28px; height:8px; border-radius:4px; background:#2a323f; box-shadow:inset 0 1px 2px #000a; transform:translateX(-50%); }
+.lunar-game .clipboard-sheet {
+  min-height:0; overflow:auto; padding:16px 14px 12px; border-radius:2px; color:#dbe4ef; scrollbar-width:thin; scrollbar-color:#3a4a60 transparent;
+  background:repeating-linear-gradient(180deg,transparent 0 27px,#ffffff07 27px 28px),linear-gradient(180deg,#151e2b,#101823);
+  box-shadow:0 2px 0 #0008,inset 0 0 0 1px #2b3749;
+}
+.lunar-game .clipboard-sheet header { padding-bottom:9px; border-bottom:2px solid #33435a; }
+.lunar-game .clipboard-sheet header span,
+.lunar-game .clipboard-sheet header small { display:block; color:var(--game-dim); font:8.5px ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.12em; }
+.lunar-game .clipboard-sheet h3 { margin:4px 0 3px; font-size:17px; letter-spacing:.14em; }
+.lunar-game .clipboard-sheet ol { margin:0; padding:0; list-style:none; }
+.lunar-game .clipboard-sheet ol > li { display:grid; grid-template-columns:22px minmax(0,1fr) auto; align-items:start; gap:8px; margin:0 -14px; padding:9px 14px; border-bottom:1px dashed #2b3749; }
+.lunar-game .clipboard-sheet ol > li > b { color:var(--game-dim); font:12px ui-monospace,SFMono-Regular,Consolas,monospace; line-height:1.4; }
+.lunar-game .clipboard-sheet li p { margin:0; color:#c9d4e2; font-size:12px; line-height:1.4; }
+.lunar-game .clipboard-sheet li small { display:block; margin-top:4px; color:var(--game-cyan); font-size:10.5px; line-height:1.4; }
+.lunar-game .clipboard-parts { display:flex; flex-wrap:wrap; gap:2px 10px; margin-top:4px; }
+.lunar-game .clipboard-parts i { color:var(--game-dim); font:10px ui-monospace,SFMono-Regular,Consolas,monospace; font-style:normal; }
+.lunar-game .clipboard-parts i.ok { color:var(--game-green); }
+.lunar-game .clipboard-sheet li > em { padding:3px 5px; border:1px solid #3a4658; border-radius:2px; color:#7c889b; font:700 8px ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.1em; white-space:nowrap; transform:rotate(-2deg); }
+.lunar-game .clipboard-sheet li.active > em { border-color:var(--game-cyan); color:var(--game-cyan); }
+.lunar-game .clipboard-sheet li.done > em { border-color:var(--game-green); color:var(--game-green); }
+.lunar-game .clipboard-sheet li.done > b { color:var(--game-green); }
+.lunar-game .clipboard-sheet li.done p { color:#8696ab; text-decoration:line-through; text-decoration-color:#6ee7b766; }
+.lunar-game .clipboard-sheet li.next { background:#4cc9f00f; box-shadow:inset 2px 0 var(--game-cyan); }
+.lunar-game .clipboard-sheet li.next > b { color:var(--game-cyan); }
+.lunar-game .clipboard-sheet li.next p { color:var(--game-text); font-weight:650; }
+.lunar-game .clipboard-sheet footer { margin-top:10px; color:var(--game-dim); font-size:10px; line-height:1.5; }
+.lunar-game .pad-scene-window { min-width:0; min-height:0; }
+.lunar-game .pad-status-strip { display:grid; gap:6px; min-width:0; }
+.lunar-game .pad-hint { margin:0; padding:7px 12px; border:1px solid #3a4a60b8; border-left:2px solid var(--game-cyan); border-radius:3px; color:#d2deec; background:#07101ceb; font-size:12px; line-height:1.45; pointer-events:auto; }
+.lunar-game .pad-hint b { margin-right:9px; color:var(--game-cyan); font-size:9px; letter-spacing:.12em; }
+/* Keyboard users get the same pad actions; the group only appears while it has focus. */
+.lunar-game .pad-keyboard-actions { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.lunar-game .pad-keyboard-actions:focus-within { position:static; display:flex; flex-wrap:wrap; align-items:center; gap:5px; width:auto; height:auto; overflow:visible; padding:7px 10px; border:1px solid #3a4a60b8; border-radius:3px; background:#07101ceb; clip-path:none; pointer-events:auto; }
+.lunar-game .pad-keyboard-actions span { color:var(--game-muted); font-size:9px; letter-spacing:.1em; }
+.lunar-game .pad-keyboard-actions .game-button { min-height:28px; padding:4px 8px; font-size:10px; }
+@media (max-width:820px) {
+  .lunar-game .pad-phase > .pad-clipboard,
+  .lunar-game .pad-phase > .window-review { max-height:26vh; }
+  .lunar-game .pad-phase > .pad-clipboard { margin-top:10px; }
+}
