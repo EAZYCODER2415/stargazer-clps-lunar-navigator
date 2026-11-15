@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ASSEMBLY_COMPONENTS, COUNTDOWN_SECONDS, RADIO_QUESTIONS, getActiveWindow } from './gameEngine';
+import { ASSEMBLY_COMPONENTS, COUNTDOWN_SECONDS, RADIO_QUESTIONS } from './gameEngine';
 
 // Stage panels for the stages that share the 3D mission scene. Each one leaves a clear
 // "scene window" ([data-scene-window]) that MissionScene3D frames its subject inside,
@@ -58,7 +58,7 @@ export function Countdown({ state, dispatch, siteName }) {
   return <section className="game-panel phase-panel countdown-phase stage-split stage-bottom">
     <SceneWindow />
     <div className="stage-console countdown-console">
-      <div className="countdown-readout"><span className="eyebrow">TERMINAL COUNTDOWN · {getActiveWindow(state)?.name}</span><div className="countdown-number">T−{Math.max(0, t).toFixed(1)}</div></div>
+      <div className="countdown-readout"><span className="eyebrow">TERMINAL COUNTDOWN</span><div className="countdown-number">T−{Math.max(0, t).toFixed(1)}</div></div>
       <div className="countdown-guide"><h2>Vehicle is on internal power</h2><p>Wait for the launch cue. The valid command window is T−0 ±3 seconds; a missed cue holds the vehicle for another attempt.</p><div className="countdown-track"><i style={{ width: `${Math.max(0, Math.min(100, (1 - t / COUNTDOWN_SECONDS) * 100))}%` }} /></div>{state.pad.feedback && <p className="feedback" role="status">{state.pad.feedback}</p>}</div>
       <Button className="primary-action" onClick={() => dispatch({ type: 'LAUNCH', siteName })}>LAUNCH</Button>
     </div>
