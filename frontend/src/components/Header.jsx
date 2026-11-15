@@ -24,6 +24,14 @@ const Header = ({
   // To the minute: the header has to fit a 1366 px wide screen, and the timeline shows the full time.
   const utcTime = `${time.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
+  // The positive message appears only when both are visible; otherwise say which one is missing.
+  // Radio contact needs Earth, power needs the Sun.
+  let headline;
+  if (sunUp && earthUp) headline = 'Solar power and direct radio contact';
+  else if (earthUp) headline = 'Radio link open, no solar power';
+  else if (sunUp) headline = 'Solar power, no direct radio contact';
+  else headline = 'No power, no direct radio contact';
+
   const handleSiteChange = (site) => {
     onSiteChange(site);
     setIsSiteMenuOpen(false);
@@ -81,7 +89,7 @@ const Header = ({
         aria-haspopup="dialog"
         title="see verdict message"
       >
-        <strong>🌍 Direct radio contact is {sunUp && earthUp ? 'possible' : 'impossible'}</strong>
+        <strong>🌍 {headline}</strong>
       </button>
       {isVerdictOpen && (
         <div className="mission-verdict-popup" role="dialog" aria-label="Verdict message">
