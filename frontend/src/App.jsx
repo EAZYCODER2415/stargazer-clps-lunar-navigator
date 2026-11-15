@@ -152,19 +152,15 @@ function App() {
   const handleStep = (hours) => setClampedTime(new Date(time.getTime() + hours * 3600000));
 
   // Both searches stop at the end of the lunar day; null means no more rises or sets before then.
-  const nextSunTransition = findNextHorizonTransition(
-    time,
-    calculateSunPosition,
-    selectedSite.latitude,
-    selectedSite.longitude,
-    windowEnd
+  // They walk the ephemeris in half-hour steps, so they are redone only when the time or site changes,
+  // not every time the camera turns and this component re-renders.
+  const nextSunTransition = useMemo(
+    () => findNextHorizonTransition(time, calculateSunPosition, selectedSite.latitude, selectedSite.longitude, windowEnd),
+    [time, selectedSite, windowEnd]
   );
-  const nextEarthTransition = findNextHorizonTransition(
-    time,
-    calculateEarthPosition,
-    selectedSite.latitude,
-    selectedSite.longitude,
-    windowEnd
+  const nextEarthTransition = useMemo(
+    () => findNextHorizonTransition(time, calculateEarthPosition, selectedSite.latitude, selectedSite.longitude, windowEnd),
+    [time, selectedSite, windowEnd]
   );
   const sunSummary = useMemo(
     () => getVisibilitySummary(windowStart, calculateSunPosition, selectedSite.latitude, selectedSite.longitude),
