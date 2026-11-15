@@ -80,7 +80,7 @@ function LunarSiteMap({ sites, records, selectedSiteId, onSelect, onConfirm, onB
     return { site, x: center.x + radial * Math.sin(longitude), y: center.y - radial * Math.cos(longitude) };
   });
   const active = points.find((point) => point.site.id === (hoveredSiteId || selectedSiteId));
-  const tooltipX = active ? Math.max(18, Math.min(682, active.x > center.x + 35 ? active.x - 312 : active.x + 24)) : 0;
+  const tooltipX = active ? Math.max(18, Math.min(552, active.x > center.x + 35 ? active.x - 342 : active.x + 24)) : 0;
   const tooltipY = active ? Math.max(18, Math.min(552, active.y < 170 ? active.y + 20 : active.y - 112)) : 0;
   const shortNames = { malapert: 'MALAPERT', shackleton: 'SHACKLETON', 'mons-mouton': 'MONS MOUTON' };
 
@@ -105,7 +105,7 @@ function LunarSiteMap({ sites, records, selectedSiteId, onSelect, onConfirm, onB
           <text className="lunar-map-site-label" x={isRight ? 12 : -12} y="-11" textAnchor={isRight ? 'start' : 'end'}>{shortNames[site.id]}</text>
         </g>;
       })}
-      {active && <g className="lunar-map-tooltip" transform={`translate(${tooltipX} ${tooltipY})`} pointerEvents="none"><rect width="300" height="104" rx="5" /><text className="lunar-map-tooltip-title" x="13" y="21">{active.site.name.toUpperCase()}</text><text className="lunar-map-tooltip-label" x="13" y="47">OPERATING WINDOW</text><text className="lunar-map-tooltip-value" x="287" y="47" textAnchor="end">{formatDetailedDuration(records[active.site.id].durationMs)}</text><text className="lunar-map-tooltip-label" x="13" y="76">PREPARATION ALLOWANCE</text><text className="lunar-map-tooltip-value" x="287" y="76" textAnchor="end">{formatDetailedDuration(preparationAllowance(records[active.site.id]))} available</text></g>}
+      {active && <g className="lunar-map-tooltip" transform={`translate(${tooltipX} ${tooltipY})`} pointerEvents="none"><rect width="330" height="126" rx="5" /><text className="lunar-map-tooltip-title" x="13" y="21">{active.site.name.toUpperCase()}</text><text className="lunar-map-tooltip-label" x="13" y="45">OPERATING WINDOW</text><text className="lunar-map-tooltip-value" x="13" y="62">{formatDetailedDuration(records[active.site.id].durationMs)}</text><text className="lunar-map-tooltip-label" x="13" y="87">PREPARATION ALLOWANCE</text><text className="lunar-map-tooltip-value" x="13" y="105">{formatDetailedDuration(preparationAllowance(records[active.site.id]))} available</text></g>}
       <text className="lunar-map-scale" x="450" y="626" textAnchor="middle">MARKER POSITIONS USE THE RECORDED PROJECT COORDINATES · SOUTH POLAR PROJECTION</text>
     </svg>
     <div className="planner-map-actions"><button type="button" className="planner-back-to-windows" onClick={onBack}>BACK TO WINDOW REVIEW</button><button type="button" className="planner-commit" disabled={!selectedSiteId} onClick={onConfirm}>CONFIRM SITE</button></div>

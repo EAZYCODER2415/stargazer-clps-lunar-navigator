@@ -120,6 +120,18 @@ export const calculateEarthPosition = (time, latitude, longitude) => (
   calculatePosition('earth', time, latitude, longitude)
 );
 
+export const getEphemerisRange = (latitude, longitude) => {
+  const site = findSite(latitude, longitude);
+  const start = site.sun[0].time;
+  const end = site.sun[site.sun.length - 1].time;
+  return {
+    start: new Date(start),
+    end: new Date(end),
+    sampleCount: site.sun.length,
+    sampleIntervalMs: site.sun[1].time.getTime() - start.getTime()
+  };
+};
+
 export const azElToCartesian = (azimuth, elevation) => {
   const azimuthRadians = azimuth * Math.PI / 180;
   const elevationRadians = elevation * Math.PI / 180;
