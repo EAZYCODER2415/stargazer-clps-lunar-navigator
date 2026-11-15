@@ -65,11 +65,44 @@ const calculatePosition = (body, time, latitude, longitude) => (
   interpolate(findSite(latitude, longitude)[body], time)
 );
 
-export const getBestOverlap = (latitude, longitude) => {
-  const overlap = findSite(latitude, longitude).best_overlap;
-  return overlap?.start
-    ? { hours: overlap.hours, time: parseEphemerisTime(overlap.start) }
+const LUNAR_DAY_MS = 29.53 * 86400000;
+const OVERLAP_STEP_MS = 30 * 60 * 1000;
+const bestOverlapCache = new Map();
+
+/**
+ * The longest unbroken stretch with BOTH the Sun and Earth above the real (LOLA) skyline, within the
+ * 29.53-day lunar day that starts at `startTime`. Checked every 30 minutes. Returns
+ * { hours, time } where `time` is when the stretch begins, or null if the two are never up together.
+ * (The `best_overlap` stored in the ephemeris files assumed a flat horizon, so it is not used.)
+ * Results are remembered per site and start time.
+ */
+export const getBestOverlap = (latitude, longitude, startTime) => {
+  const key = `${findSite(latitude, longitude).site.id}|${startTime.getTime()}`;
+  if (bestOverlapCache.has(key)) return bestOverlapCache.get(key);
+
+  const startMs = startTime.getTime();
+  const bothUp = (timeMs) => {
+    const time = new Date(timeMs);
+    return clearanceOf(calculatePosition('sun', time, latitude, longitude), latitude, longitude) > 0
+      && clearanceOf(calculatePosition('earth', time, latitude, longitude), latitude, longitude) > 0;
+  };
+  let best = null;
+  let runStart = null;
+  let runSteps = 0;
+  for (let timeMs = startMs; timeMs <= startMs + LUNAR_DAY_MS; timeMs += OVERLAP_STEP_MS) {
+    if (bothUp(timeMs)) {
+      if (runStart === null) { runStart = timeMs; runSteps = 0; }
+      runSteps += 1;
+      if (!best || runSteps > best.steps) best = { steps: runSteps, start: runStart };
+    } else {
+      runStart = null;
+    }
+  }
+  const result = best
+    ? { hours: best.steps * (OVERLAP_STEP_MS / 3600000), time: new Date(best.start) }
     : null;
+  bestOverlapCache.set(key, result);
+  return result;
 };
 
 export const calculateSunPosition = (time, latitude, longitude) => (

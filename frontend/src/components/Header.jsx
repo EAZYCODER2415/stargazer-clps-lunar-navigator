@@ -81,7 +81,7 @@ const Header = ({
         aria-haspopup="dialog"
         title="see verdict message"
       >
-        <strong>🌍 Direct radio contact is {sunUp && earthUp ? 'possible' : 'impossible'}</strong>
+        <strong>🌍 Direct radio contact is {earthUp ? 'possible' : 'impossible'}</strong>
       </button>
       {isVerdictOpen && (
         <div className="mission-verdict-popup" role="dialog" aria-label="Verdict message">

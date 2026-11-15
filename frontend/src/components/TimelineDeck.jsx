@@ -15,7 +15,9 @@ const TimelineDeck = ({
   earthBands,
   onJumpTo,
   bestWindow,
-  telemetry
+  telemetry,
+  viewMode,
+  cameraInfo
 }) => {
   const [timeString, setTimeString] = useState(time.toISOString().replace('T', ' ').replace('Z', ' UTC'));
   const [dateSliderValue, setDateSliderValue] = useState(time.getTime());
@@ -103,6 +105,14 @@ const TimelineDeck = ({
     return `${snr.toFixed(1)} dB`;
   };
 
+  // Footer readouts of the live camera: which view, how wide, and which way it is pointing.
+  const COMPASS_POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const viewLabel = viewMode === 'free' ? 'FREE VIEW' : 'POV / SURFACE CAM';
+  const fovLabel = cameraInfo ? `${cameraInfo.fov.toFixed(0)}°` : '—';
+  const centerAzLabel = cameraInfo
+    ? `${cameraInfo.centerAz.toFixed(1)}° ${COMPASS_POINTS[Math.round(cameraInfo.centerAz / 45) % 8]}`
+    : '—';
+
   const timelineDuration = 29.53 * 86400000;
   const timelineProgress = Math.max(
     0,
@@ -120,17 +130,17 @@ const TimelineDeck = ({
             className="timeline-deck-pill"
             aria-label="Current camera view"
           >
-            FREE VIEW
+            {viewLabel}
           </button>
 
           <div className="timeline-deck-meta">
             <span>FOV:</span>
-            <strong>62° Wide</strong>
+            <strong>{fovLabel}</strong>
           </div>
 
           <div className="timeline-deck-meta">
             <span>Center Az:</span>
-            <strong>180.0° S</strong>
+            <strong>{centerAzLabel}</strong>
           </div>
         </div>
 
@@ -189,14 +199,15 @@ const TimelineDeck = ({
               className="timeline-deck-select"
               aria-label="Time speed"
             >
-              <option value={1}>1x (1h/sec)</option>
-              <option value={2}>2x (2h/sec)</option>
-              <option value={4}>4x (4h/sec)</option>
-              <option value={6}>6x (6h/sec)</option>
-              <option value={12}>12x (12h/sec)</option>
-              <option value={24}>24x (24h/sec)</option>
-              <option value={3600}>3600x (1h / sec)</option>
-              <option value={86400}>86400x (1d / sec)</option>
+              {/* The value is hours of mission time added per second of playback (and per step click). */}
+              <option value={1}>1x (1 h/sec)</option>
+              <option value={2}>2x (2 h/sec)</option>
+              <option value={4}>4x (4 h/sec)</option>
+              <option value={6}>6x (6 h/sec)</option>
+              <option value={12}>12x (12 h/sec)</option>
+              <option value={24}>24x (1 day/sec)</option>
+              <option value={3600}>3600x (150 days/sec)</option>
+              <option value={86400}>86400x (3600 days/sec)</option>
             </select>
           </div>
           <div className="timeline-jump-actions">
