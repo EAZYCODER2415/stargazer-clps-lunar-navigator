@@ -16,7 +16,8 @@ def _split(value: str) -> list[str]:
 
 @dataclass(frozen=True)
 class Settings:
-    # STARGAZER_DATABASE_URL: sqlite:///path/to/stargazer.db, or a plain file path. Always opened read-only.
+    # STARGAZER_DATABASE_URL: sqlite:///path/to/stargazer.db or a plain file path (the default), or
+    # postgresql://user:password@host/database for a hosted copy (see docs/NEON.md). Always read-only.
     database_url: str = field(default_factory=lambda: os.environ.get(
         "STARGAZER_DATABASE_URL", f"sqlite:///{(BACKEND_DIR / 'data' / 'stargazer.db').as_posix()}"))
     # STARGAZER_CORS_ORIGINS: comma-separated origins allowed to call the API from a browser.

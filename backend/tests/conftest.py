@@ -1,6 +1,7 @@
 """Shared fixtures: one database built from the repo data per test session, and an API client on top of it."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -44,7 +45,14 @@ def client(db_path):
     from app.config import Settings
     from app.main import create_app
 
-    app = create_app(Settings(database_url=f"sqlite:///{db_path.as_posix()}"))
+    database_url = f"sqlite:///{db_path.as_posix()}"
+    # Optional: run this whole suite against the hosted (PostgreSQL) path instead of the SQLite file.
+    # STARGAZER_TEST_PG_URL must be a database the tests may overwrite. See tests/test_postgres.py.
+    if os.environ.get("STARGAZER_TEST_API_ON_PG") == "1" and os.environ.get("STARGAZER_TEST_PG_URL"):
+        import push_to_postgres
+        database_url = os.environ["STARGAZER_TEST_PG_URL"]
+        push_to_postgres.push(db_path, database_url, quiet=True)
+    app = create_app(Settings(database_url=database_url))
     with TestClient(app) as test_client:
         yield test_client
 

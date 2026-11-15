@@ -37,6 +37,19 @@ and Windows 11 Smart App Control refused to load them on a team laptop ("An Appl
 policy has blocked this file"), which stopped the backend from starting. The only compiled packages
 the backend needs now are numpy (build step) and pydantic.
 
+## Hosted copy (Neon / PostgreSQL)
+
+The API reads the local SQLite file by default. It can read a hosted PostgreSQL copy of the same 18
+tables instead, with the same answers:
+
+```
+$env:STARGAZER_PG_URL = Read-Host "Neon address"       # paste it at the prompt; it holds a password, keep it private
+python backend\scripts\push_to_postgres.py             # upload the built file (one transaction)
+$env:STARGAZER_DATABASE_URL = $env:STARGAZER_PG_URL    # then start uvicorn as above
+```
+
+Steps, differences from SQLite and what was tested: [docs/NEON.md](docs/NEON.md).
+
 ## What is in the database
 
 | data | source | rows now |
@@ -174,12 +187,14 @@ CORS allows `http://localhost:5173` by default. Set `STARGAZER_CORS_ORIGINS` for
 
 | variable | default | meaning |
 | --- | --- | --- |
-| `STARGAZER_DATABASE_URL` | `sqlite:///backend/data/stargazer.db` (absolute) | `sqlite:///path` or a plain file path |
+| `STARGAZER_DATABASE_URL` | `sqlite:///backend/data/stargazer.db` (absolute) | `sqlite:///path`, a plain file path, or `postgresql://user:password@host/database` for a hosted copy |
+| `STARGAZER_PG_URL` | none | where `scripts/push_to_postgres.py` uploads to. Holds a password: never commit it |
 | `STARGAZER_CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | comma-separated origins |
 | `STARGAZER_MAX_ROWS` | `3000` | row cap per response |
 | `STARGAZER_CACHE_MAX_AGE` | `3600` | seconds in `Cache-Control` |
 
-To host it: build the database as part of the deploy, then
+To host it: build the database as part of the deploy (or set `STARGAZER_DATABASE_URL` to the hosted
+copy, see [docs/NEON.md](docs/NEON.md)), then
 `python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000`.
 
 ## Things you should not read into the numbers
