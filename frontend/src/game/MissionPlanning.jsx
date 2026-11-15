@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import landingSites from '../data/landingSites.json';
 import { findJointVisibilityWindows, getEphemerisRange, getLunarSiteConditions } from '../utils/ephemerisRuntime';
+import MissionHeader from './MissionHeader';
 import './planning.css';
 
 const LunarScene3D = lazy(() => import('../components/LunarScene3D'));
@@ -112,7 +113,7 @@ function LunarSiteMap({ sites, records, selectedSiteId, onSelect, onConfirm, onB
   </section></div>;
 }
 
-function MissionPlanning({ onCommit }) {
+function MissionPlanning({ onCommit, onDebugTap }) {
   const firstSite = landingSites[0];
   const [siteId, setSiteId] = useState(firstSite.id);
   const [planTime, setPlanTime] = useState(() => getEphemerisRange(firstSite.latitude, firstSite.longitude).start.getTime());
@@ -246,7 +247,7 @@ function MissionPlanning({ onCommit }) {
 
   return <main className={`mission-planner ${choosingSite ? 'choosing-site' : ''}`} aria-label="Lunar mission planning">
     <div className="planner-environment"><Suspense fallback={<div className="planner-scene-loading">LOADING SITE HORIZON…</div>}><LunarScene3D time={currentDate} windowStart={range.start} selectedSite={site} showSolarFlux showDTELink showGrid showHorizonMask useTerrain cameraYaw={camera.yaw} cameraPitch={camera.pitch} viewMode="surface" viewResetCount={0} invertLook={false} onLookDrag={(dx, dy) => setCamera((current) => ({ yaw: current.yaw + dx, pitch: Math.max(-80, Math.min(80, current.pitch + dy)) }))} onCameraInfo={() => {}} cameraInfo={null} showInterface={false} /></Suspense></div>
-    <header className="planner-topbar"><div className="planner-brand"><img src="/favicon.svg" alt="" /><div><span>STARGAZER · MISSION PLANNING</span><b>MISSION 001</b></div></div><div className="planner-stage"><small>STAGE 00 · LUNAR OPERATING WINDOW DISCOVERY</small><strong>{choosingSite ? 'Compare your three recorded opportunities' : 'Find your surface opportunity'}</strong></div><div className="planner-time-mode"><span>{choosingSite ? 'SHARED PLANNING REFERENCE' : 'PLANNING TIME · MANUAL SCRUB'}</span><b>{formatUtc(choosingSite ? PLANNING_REFERENCE_TIME : planTime)}</b></div></header>
+    <MissionHeader className="planning-header" stageLabel="STAGE 00 · LUNAR OPERATING WINDOW DISCOVERY" stageTitle={choosingSite ? 'Compare your three recorded opportunities' : 'Find your surface opportunity'} timeLabel={choosingSite ? 'SHARED PLANNING REFERENCE' : 'PLANNING TIME · MANUAL SCRUB'} timeValue={formatUtc(choosingSite ? PLANNING_REFERENCE_TIME : planTime)} onStageLabelClick={onDebugTap} />
 
     <aside className="planner-record-board" aria-label="Candidate landing sites and window records"><div className="planner-panel-title"><span>{choosingSite ? 'RECORDED WINDOWS' : 'MISSION CLIPBOARD'}</span><b>0{Object.keys(records).length} / 03 RECORDED</b></div><p className="planner-short-instruction">{choosingSite ? 'Compare the three actual visibility windows on the lunar map, then confirm one site.' : 'Investigate each site. Record one interval where sunlight and direct Earth visibility overlap.'}</p>{landingSites.map((item, index) => {
       const record = records[item.id];

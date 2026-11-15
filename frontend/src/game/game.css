@@ -290,10 +290,142 @@
 .lunar-game .mission-complete { padding:12px; border:1px solid #40516ab8; background:#091420e8; box-shadow:0 10px 28px #0005; backdrop-filter:blur(8px); }
 .lunar-game .no-launch-phase { border-color:#8a6433b8 !important; background:linear-gradient(120deg,#1b170fe8,#10131ce8) !important; box-shadow:inset 3px 0 #fbbf24,0 15px 40px #0007 !important; }
 .lunar-game .mission-scene-background.scene-landing { background:radial-gradient(ellipse at 50% 80%,#282522,#070a10 75%); }
+.stage-debug-trigger,
+.stargazer-stage-trigger,
+.planner-debug-trigger {
+  display:block;
+  width:max-content;
+  padding:0;
+  border:0;
+  color:#4cc9f0;
+  background:transparent;
+  font:inherit;
+  font-size:10px;
+  font-weight:750;
+  letter-spacing:.13em;
+  text-align:left;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.stage-debug-trigger:hover,
+.stargazer-stage-trigger:hover,
+.planner-debug-trigger:hover { color:#c6f4ff; text-shadow:0 0 12px #4cc9f088; }
+.stage-debug-trigger:focus-visible,
+.stargazer-stage-trigger:focus-visible,
+.planner-debug-trigger:focus-visible { outline:1px solid #4cc9f0; outline-offset:4px; }
+.stage-debug-backdrop { position:fixed; z-index:5000; inset:0; display:grid; place-items:center; padding:18px; background:#02050bd9; backdrop-filter:blur(10px); }
+.stage-debug-window { width:min(620px,100%); max-height:min(82vh,760px); overflow:auto; padding:22px; border:1px solid #4a5d79; border-radius:6px; color:#eef3fa; background:linear-gradient(145deg,#101a28,#080e18); box-shadow:inset 0 1px #ffffff12,0 25px 90px #000c,0 0 34px #4cc9f018; }
+.stage-debug-heading { display:flex; justify-content:space-between; gap:16px; padding-bottom:15px; border-bottom:1px solid #2f3e54; }
+.stage-debug-heading span { color:#4cc9f0; font:750 9px ui-monospace,monospace; letter-spacing:.15em; }
+.stage-debug-heading h2 { margin:7px 0 5px; font-size:22px; }
+.stage-debug-heading p { max-width:480px; margin:0; color:#a8b2c4; font-size:12px; line-height:1.55; }
+.stage-debug-close { flex:0 0 34px; width:34px; height:34px; border:1px solid #35445b; border-radius:3px; color:#d8e1ec; background:#111c2a; font-size:22px; cursor:pointer; }
+.stage-debug-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding-top:14px; }
+.stage-debug-options button { min-height:52px; display:grid; grid-template-columns:30px 1fr auto; align-items:center; gap:8px; padding:9px; border:1px solid #2d3d53; border-radius:3px; color:#e8f0f9; background:linear-gradient(105deg,#101b29,#0b121d); text-align:left; cursor:pointer; }
+.stage-debug-options button:hover { border-color:#4cc9f0; background:#102338; }
+.stage-debug-options button > span { color:#4cc9f0; font:11px ui-monospace,monospace; }
+.stage-debug-options button > b { font-size:11px; }
+.stage-debug-options button > i { color:#7c8ba1; font:8px ui-monospace,monospace; font-style:normal; }
 @media (max-width:700px) {
   .lunar-game > .mission-topbar::after { display:none; }
   .lunar-game.game-phase-ascent > .ascent-phase,
   .lunar-game.game-phase-transit > .transit-phase,
   .lunar-game.game-phase-landing > .landing-phase { width:100%; padding:14px; }
   .lunar-game .flight-schematic { grid-template-columns:38px 48px minmax(0,1fr); gap:8px; padding:12px; }
+  .stage-debug-window { padding:16px; }
+  .stage-debug-options { grid-template-columns:1fr; }
+}
+
+/* Shared Stage 00 and mission header, tuned for laptop layouts. */
+.stargazer-header {
+  position:relative;
+  z-index:4;
+  width:100%;
+  height:72px;
+  min-height:72px;
+  display:grid;
+  grid-template-columns:minmax(330px,1fr) minmax(310px,1fr) minmax(390px,1fr);
+  align-items:center;
+  gap:18px;
+  padding:7px 20px;
+  border:1px solid #47536b77;
+  border-radius:4px;
+  color:#e0e0ff;
+  background:linear-gradient(100deg,#05070ded,#0b101bdd 52%,#05070ded);
+  box-shadow:inset 0 1px #ffffff0b,0 8px 28px #0008;
+  backdrop-filter:blur(10px);
+}
+.stargazer-header-brand { min-width:0; display:flex; align-items:center; gap:12px; color:inherit; text-decoration:none; }
+.stargazer-header-brand img { width:38px; height:38px; flex:0 0 auto; }
+.stargazer-header-brand > span { min-width:0; display:grid; gap:4px; }
+.stargazer-header-brand b { overflow:hidden; color:#4cc9f0; font-size:9px; letter-spacing:.13em; text-overflow:ellipsis; white-space:nowrap; }
+.stargazer-header-brand strong { overflow:hidden; font-size:13px; letter-spacing:.04em; text-overflow:ellipsis; white-space:nowrap; }
+.stargazer-header-brand i { color:#a0a0c0; font-size:11px; font-style:normal; font-weight:500; }
+.stargazer-header-stage { min-width:0; display:grid; justify-items:center; gap:4px; text-align:center; }
+.stargazer-stage-trigger { justify-self:center; }
+.stargazer-header-stage > strong { overflow:hidden; max-width:100%; font-size:15px; line-height:1.2; text-overflow:ellipsis; white-space:nowrap; }
+.stargazer-header-status { min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:14px; }
+.stargazer-header-time { min-width:145px; display:grid; gap:4px; text-align:right; }
+.stargazer-header-time small { color:#a0a0c0; font-size:8px; letter-spacing:.12em; }
+.stargazer-header-time b { color:#4cc9f0; font:600 15px ui-monospace,SFMono-Regular,Consolas,monospace; white-space:nowrap; }
+.stargazer-header-controls { display:flex; align-items:center; gap:6px; }
+.stargazer-header-controls .game-button { min-height:32px; padding:6px 9px; font-size:10px; white-space:nowrap; }
+.stargazer-header-controls .header-speed { display:grid; gap:2px; color:#a0a0c0; font-size:7px; letter-spacing:.1em; }
+.stargazer-header-controls .header-speed select { min-width:70px; min-height:29px; padding:4px 7px; font-size:10px; }
+.mission-planner > .stargazer-header { position:absolute; top:0; right:0; left:0; border-width:0 0 1px; border-radius:0; }
+.lunar-game { min-width:1100px; display:grid; grid-template-rows:72px auto minmax(0,1fr); gap:8px; padding:10px 18px 14px; }
+.lunar-game > .stargazer-header { grid-row:1; }
+.lunar-game > .mission-context { position:relative; z-index:1; grid-row:2; width:100%; min-height:38px; display:flex; justify-content:space-between; align-items:center; gap:20px; }
+.mission-context > p { max-width:690px; margin:0; padding:7px 11px; border-left:2px solid #4cc9f0; color:#c2ccda; background:linear-gradient(90deg,#08121dde,#08121d66 84%,transparent); font-size:11px; line-height:1.4; text-shadow:0 1px 4px #000; }
+.mission-context .mission-target { max-width:440px; padding:6px 10px; }
+.mission-context .site-picker { min-width:220px; display:flex; align-items:center; gap:9px; padding:5px 8px; border:1px solid #3a4a60b8; background:#09111de8; }
+.mission-context .site-picker select { flex:1; min-width:0; min-height:30px; }
+.lunar-game > .game-panel.phase-panel { grid-row:3; min-height:0; }
+.lunar-game.game-phase-assembly > .assembly-phase,
+.lunar-game.game-phase-assembly-complete > .assembly-phase { overflow:hidden; }
+.assembly-console { position:absolute; z-index:2; top:16px; right:16px; width:310px; max-height:calc(100% - 32px); overflow:auto; padding:14px; border:1px solid #465875cc; border-radius:3px; background:linear-gradient(135deg,#08121eee,#0b1422e9); box-shadow:inset 0 1px #ffffff0d,0 12px 34px #0009; backdrop-filter:blur(9px); }
+.lunar-game.game-phase-assembly .assembly-console { pointer-events:auto; }
+.assembly-console-heading h2 { margin:6px 0; font-size:17px; line-height:1.2; }
+.assembly-console-heading p { margin:0; color:#aeb9ca; font-size:10px; line-height:1.5; }
+.assembly-console-status { display:grid; gap:4px; margin:12px 0 0; padding:9px; border:1px solid #34435a; background:#0b1724; }
+.assembly-console-status span { color:#e0e0ff; font-size:11px; font-weight:700; }
+.assembly-console-status small { color:#8997aa; font-size:9px; }
+.assembly-accessibility { margin-top:10px; border-top:1px solid #34435a; padding-top:8px; }
+.assembly-accessibility summary { color:#8c9bb0; font-size:9px; cursor:pointer; }
+.accessible-assembly-list { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+.accessible-assembly-list > div { display:grid; align-content:start; gap:5px; }
+.accessible-assembly-list > div > b { color:#4cc9f0; font-size:8px; text-transform:uppercase; }
+.accessible-assembly-list .game-button { min-height:28px; padding:4px; font-size:8px; text-align:left; }
+.assembly-phase > .feedback { margin:0; }
+.lunar-game.game-phase-assembly-complete .assembly-console { top:auto; bottom:18px; }
+.lunar-game.game-phase-assembly-complete .phase-action { position:absolute; z-index:3; right:340px; bottom:20px; left:24px; margin:0; padding:10px 14px; border:1px solid #40516a; background:#07111de8; }
+.lunar-game.game-phase-launchpad > .pad-phase { display:grid; grid-template-columns:minmax(255px,.9fr) minmax(360px,1.55fr) minmax(290px,1fr); grid-template-rows:58px minmax(0,1fr); align-items:stretch; gap:12px; padding:0; overflow:hidden; border-color:transparent; background:transparent; box-shadow:none; }
+.lunar-game.game-phase-launchpad .pad-phase > .phase-copy { grid-row:1; grid-column:1/-1; max-width:none; align-self:center; padding:6px 12px; border:1px solid #35465db0; border-left:2px solid #4cc9f0; background:linear-gradient(90deg,#08121ee8,#08121e99 54%,transparent); }
+.lunar-game.game-phase-launchpad .pad-phase > .phase-copy h2 { margin:2px 0; font-size:15px; }
+.lunar-game.game-phase-launchpad .pad-phase > .phase-copy p { font-size:9px; }
+.lunar-game.game-phase-launchpad .pad-columns { display:contents; }
+.lunar-game.game-phase-launchpad .pad-checklist { grid-row:2; grid-column:1; width:auto; max-height:none; min-height:0; overflow:auto; align-self:stretch; padding:10px 12px; }
+.lunar-game.game-phase-launchpad .window-review { grid-row:2; grid-column:3; width:auto; max-height:none; min-height:0; overflow:auto; align-self:stretch; padding:12px; }
+.lunar-game.game-phase-launchpad .pad-monitor-dropzone { position:relative; top:auto; right:auto; bottom:auto; left:auto; grid-row:2; grid-column:2; width:100%; height:auto; min-height:180px; max-height:55%; aspect-ratio:2.45 / 1; align-self:center; justify-content:center; padding:18px; border:1px dashed #4cc9f064; border-radius:4px; background:linear-gradient(180deg,#07111b22,#07111b44); }
+.lunar-game.game-phase-launchpad .pad-monitor-dropzone > span { font-size:9px; }
+.lunar-game.game-phase-launchpad .pad-monitor-dropzone > b { font-size:12px; }
+.lunar-game.game-phase-launchpad .pad-monitor-dropzone > small { font-size:9px; }
+.lunar-game.game-phase-launchpad .pad-phase > .progress-wrap { position:relative; top:auto; left:auto; grid-row:2; grid-column:2; z-index:4; width:70%; align-self:end; justify-self:center; margin:0 0 14px; padding:8px 10px; border:1px solid #394960; background:#0a101be8; }
+.lunar-game.game-phase-launchpad .procedure-row { grid-template-columns:24px minmax(0,1fr) auto; gap:6px; padding:8px 0; }
+.lunar-game.game-phase-launchpad .procedure-row > span { font-size:9px; line-height:1.35; }
+.lunar-game.game-phase-launchpad .procedure-row .game-button { min-height:30px; padding:5px 7px; font-size:8px; }
+.lunar-game.game-phase-launchpad .window-review h3 { margin:5px 0; }
+.lunar-game.game-phase-launchpad .go-lights { gap:4px; margin:10px 0; }
+.lunar-game.game-phase-launchpad .go-lights > div { padding:6px; }
+.lunar-game.game-phase-launchpad .window-review > .primary-action { min-height:36px; padding:7px; font-size:10px; }
+.lunar-game .mission-timeline { display:none !important; }
+.mission-scene-background.scene-assembly canvas { cursor:grab; touch-action:none; }
+.mission-scene-background.scene-assembly canvas:active { cursor:grabbing; }
+@media (max-height:760px) {
+  .lunar-game { grid-template-rows:64px auto minmax(0,1fr); padding-top:8px; }
+  .lunar-game > .stargazer-header { height:64px; min-height:64px; }
+  .stargazer-header { height:64px; min-height:64px; }
+  .lunar-game.game-phase-launchpad > .pad-phase { grid-template-rows:48px minmax(0,1fr); }
+  .lunar-game.game-phase-launchpad .pad-checklist,.lunar-game.game-phase-launchpad .window-review { padding:8px 10px; }
+  .lunar-game.game-phase-launchpad .procedure-row { padding:5px 0; }
 }

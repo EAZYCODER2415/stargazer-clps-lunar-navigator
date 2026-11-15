@@ -4,6 +4,7 @@ import { calculateEarthPosition, calculateSunPosition, clearanceOf } from '../ut
 import { ASSEMBLY_COMPONENTS, COUNTDOWN_SECONDS, GAME_SPEEDS, LAUNCH_WINDOWS, PROPELLANT_LOAD_SECONDS, RADIO_QUESTIONS, SCENARIO_START, SURVEY_DURATION_SECONDS, createInitialState, getActiveWindow, getLaunchReadiness, getWindowStatus, reducer } from './gameEngine';
 import GameGuide from './GameGuide';
 import MissionPlanning from './MissionPlanning';
+import MissionHeader from './MissionHeader';
 import './game.css';
 
 const LunarScene3D = lazy(() => import('../components/LunarScene3D'));
@@ -28,33 +29,37 @@ function clock(seconds) {
 
 function Button({ children, ...props }) { return <button type="button" className="game-button" {...props}>{children}</button>; }
 
-function MissionTimeline({ state, dispatch }) {
-  const active = getActiveWindow(state);
-  return <section className="game-panel mission-timeline" aria-label="Scenario launch windows">
-    <div className="timeline-title"><span className="eyebrow">SCENARIO OPPORTUNITIES</span><span>Illustrative launch windows · not a real launch forecast</span></div>
-    <div className="window-track">{LAUNCH_WINDOWS.map((w) => {
-      const status = getWindowStatus(state, w);
-      return <article key={w.id} className={`window-card ${status}`}><div><b>{w.name}</b><span>{status === 'active' ? 'OPEN NOW' : status.toUpperCase()}</span></div><p>{w.condition}</p><small>{Math.floor(w.openAt / 60)}–{Math.floor(w.closeAt / 60)} min · {w.duration}</small>{status === 'active' && <Button className="text-button" onClick={() => dispatch({ type: 'SKIP_WINDOW', windowId: w.id })}>Skip this window</Button>}</article>;
-    })}</div>
-    {active && <p className="window-note">{active.description}</p>}
-  </section>;
+const DEBUG_STAGES = [
+  ['planning', 'Mission planning'],
+  ['assembly', 'Vehicle assembly'],
+  ['assembly-complete', 'Assembly complete'],
+  ['launchpad', 'Launch pad'],
+  ['countdown', 'Terminal countdown'],
+  ['ascent', 'Ascent and staging'],
+  ['transit', 'Lunar transit'],
+  ['landing', 'Powered descent'],
+  ['lunar-operations', 'Lunar operations'],
+  ['no-launch', 'Preparation expired'],
+];
+
+function DebugStageWindow({ onClose, onSelect }) {
+  return <div className="stage-debug-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="stage-debug-window" role="dialog" aria-modal="true" aria-labelledby="stage-debug-title">
+      <div className="stage-debug-heading"><div><span>DEVELOPER CONSOLE · DEBUG MODE</span><h2 id="stage-debug-title">Jump to mission stage</h2><p>Loads a paused preview state for the selected stage. Stage progression still uses normal gameplay controls.</p></div><button type="button" className="stage-debug-close" onClick={onClose} aria-label="Close debug window">×</button></div>
+      <div className="stage-debug-options">{DEBUG_STAGES.map(([phase, label], index) => <button type="button" key={phase} onClick={() => onSelect(phase)}><span>{String(index).padStart(2, '0')}</span><b>{label}</b><i>LOAD STAGE →</i></button>)}</div>
+    </section>
+  </div>;
 }
 
 function Assembly({ state, dispatch }) {
   const installed = new Set(state.installedParts);
   const slots = ['fairing', 'lander', 'payload-adapter', 'upper-tank', 'upper-engine', 'interstage', 'first-tank', 'first-engine'];
-  const [selected, setSelected] = useState(state.selectedPart);
   const itemFor = (slot) => ASSEMBLY_COMPONENTS.find((item) => item.slot === slot);
   function install(part, slot) { dispatch({ type: 'INSTALL_PART', partId: part, slotId: slot }); }
   return <section className="game-panel phase-panel assembly-phase">
-    <div className="phase-copy"><span className="eyebrow">HANDS-ON · VEHICLE INTEGRATION</span><h2>Assemble the generic robotic lander vehicle</h2><p>Drag each component to its matching level on the 3D vehicle or use its labeled socket. This training stack is generic and does not represent a specific launch provider.</p></div>
-    <div className="assembly-layout"><div className="rocket-stack" aria-label="Vehicle stack component sockets">{slots.map((slot, index) => {
-      const part = itemFor(slot); const done = installed.has(part.id);
-      return <button key={slot} type="button" className={`rocket-slot slot-${slot} ${done ? 'installed' : ''}`} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); install(e.dataTransfer.getData('text/plain'), slot); }} onClick={() => install(selected, slot)} aria-label={`${part.name} socket${done ? ', installed' : ''}`}>
-        {done ? <><i style={{ background: part.color }} />{part.name}</> : <><span>{String(index + 1).padStart(2, '0')}</span>DROP {part.name.toUpperCase()} HERE</>}
-      </button>;
-    })}</div>
-      <div className="parts-panel"><span className="eyebrow">COMPONENTS · {installed.size}/{ASSEMBLY_COMPONENTS.length}</span><div className="parts-list">{ASSEMBLY_COMPONENTS.map((part) => <button key={part.id} draggable={!installed.has(part.id)} type="button" className={`part-card ${installed.has(part.id) ? 'done' : selected === part.id ? 'selected' : ''}`} onDragStart={(e) => { e.dataTransfer.setData('text/plain', part.id); dispatch({ type: 'DRAG_PART', partId: part.id }); }} onClick={() => { setSelected(part.id); dispatch({ type: 'SELECT_PART', partId: part.id }); }} disabled={installed.has(part.id)}><b><i style={{ background: part.color }} />{part.name}</b><small>{part.description}</small></button>)}</div>{state.assemblyFeedback && <p className="feedback" role="status">{state.assemblyFeedback}</p>}</div>
+    <div className="assembly-console"><div className="assembly-console-heading"><span className="eyebrow">VEHICLE INTEGRATION · {installed.size}/{ASSEMBLY_COMPONENTS.length} INSTALLED</span><h2>Drag the 3D components onto the launch stack</h2><p>Pick up a component from the hangar rack and place it at its matching level. This generic training vehicle does not represent one specific launch provider.</p></div><div className="assembly-console-status"><span>{state.selectedPart ? ASSEMBLY_COMPONENTS.find((part) => part.id === state.selectedPart)?.name : 'Select a rack component'}</span><small>Click to inspect · drag to install</small></div>
+      <details className="assembly-accessibility"><summary>Keyboard assembly controls</summary><div className="accessible-assembly-list"><div><b>Choose component</b>{ASSEMBLY_COMPONENTS.filter((part) => !installed.has(part.id)).map((part) => <Button key={part.id} className={state.selectedPart === part.id ? 'selected' : ''} onClick={() => dispatch({ type: 'SELECT_PART', partId: part.id })}>{part.name}</Button>)}</div><div><b>Install in socket</b>{slots.map((slot) => { const part = itemFor(slot); return <Button key={slot} disabled={installed.has(part.id) || !state.selectedPart} onClick={() => install(state.selectedPart, slot)}>{part.name}</Button>; })}</div></div></details>
+      {state.assemblyFeedback && <p className="feedback" role="status">{state.assemblyFeedback}</p>}
     </div>
     {state.phase === 'assembly-complete' && <div className="phase-action"><p>All eight vehicle components are installed.</p><Button onClick={() => dispatch({ type: 'PROCEED_TO_PAD' })}>Continue to launch pad →</Button></div>}
   </section>;
@@ -88,7 +93,7 @@ function LaunchPad({ state, dispatch }) {
     setDropMessage(mapped[1]);
   }
   return <section className="game-panel phase-panel pad-phase">
-    <div className="phase-copy"><span className="eyebrow">GROUND OPERATIONS</span><h2>Prepare the rocket and lander</h2><p>These are simplified training procedures. Scenario weather is deterministic game data, not a live forecast.</p></div>
+    <div className="phase-copy"><span className="eyebrow">PAD PROCEDURE</span><p>Complete the vehicle steps and assess the deterministic training weather. This is not a live forecast.</p></div>
     <div className={`pad-monitor-dropzone ${dropActive ? 'ready' : ''}`} onDragEnter={(event) => { event.preventDefault(); setDropActive(true); }} onDragLeave={() => setDropActive(false)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }} onDrop={dropEquipment}><span>MAIN LAUNCH MONITOR</span><b>Drop access equipment or an umbilical here</b><small>{dropMessage || 'The 3D pad view responds when the action is accepted.'}</small></div>
     <div className="pad-illustration" aria-label="Schematic launch pad"><div className="pad-tower"><i /><i /><i /></div><div className={`pad-rocket ${state.pad.platformRetracted ? 'clear' : ''}`}><span className="rocket-tip" /><span className="rocket-body" /><span className="rocket-engine" /></div><div className={`pad-platform ${state.pad.platformExtended ? 'extended' : ''}`} /><div className="pad-ground" /></div>
     <div className="pad-columns">
@@ -145,7 +150,25 @@ function LunarOperations({ state, dispatch, site, conditions, simTime }) {
 function GamePage() {
   const [state, dispatch] = useReducer(reducer, undefined, createInitialState);
   const [showGuide, setShowGuide] = useState(false);
+  const [showDebugWindow, setShowDebugWindow] = useState(false);
   const lastTickRef = useRef(null);
+  const stageTapRef = useRef({ count: 0, timer: null });
+  const onStageLabelClick = () => {
+    const tap = stageTapRef.current;
+    tap.count += 1;
+    window.clearTimeout(tap.timer);
+    if (tap.count >= 3) {
+      tap.count = 0;
+      setShowDebugWindow(true);
+      return;
+    }
+    tap.timer = window.setTimeout(() => { tap.count = 0; }, 1100);
+  };
+  const selectDebugStage = (phase) => {
+    dispatch({ type: 'DEBUG_SET_STAGE', phase });
+    setShowDebugWindow(false);
+    setShowGuide(false);
+  };
   useEffect(() => {
     if (state.paused || state.phase === 'no-launch') { lastTickRef.current = null; return undefined; }
     lastTickRef.current = performance.now();
@@ -175,16 +198,16 @@ function GamePage() {
   const transitElapsed = state.transit ? state.elapsed - state.transit.startedAt : 0;
   const info = phaseInfo[state.phase] || phaseInfo.assembly;
   if (state.phase === 'planning') {
-    return <MissionPlanning onCommit={(plan) => { dispatch({ type: 'COMMIT_MISSION_PLAN', plan }); setShowGuide(true); }} />;
+    return <><MissionPlanning onCommit={(plan) => { dispatch({ type: 'COMMIT_MISSION_PLAN', plan }); setShowGuide(true); }} onDebugTap={onStageLabelClick} />{showDebugWindow && <DebugStageWindow onClose={() => setShowDebugWindow(false)} onSelect={selectDebugStage} />}</>;
   }
   const openGuide = () => { if (!state.paused && !state.briefingOpen) dispatch({ type: 'TOGGLE_PAUSE' }); setShowGuide(true); };
   const closeGuide = () => { setShowGuide(false); if (state.briefingOpen) dispatch({ type: 'BEGIN_BRIEFING' }); };
   return <main className={`game-page lunar-game game-phase-${state.phase}`}>
     {showGuide && <GameGuide onClose={closeGuide} />}
-    {usesMissionScene && <Suspense fallback={<div className="mission-scene-background scene-loading" aria-hidden="true" />}><MissionScene3D phase={state.phase} elapsed={state.elapsed} installedParts={state.installedParts} pad={state.pad} ascent={state.ascent} landing={state.landing} transitElapsed={transitElapsed} onInstall={(partId, slotId) => dispatch({ type: 'INSTALL_PART', partId, slotId })} /></Suspense>}
-    <header className="mission-topbar"><a className="mission-brand" href="/"><img src="/favicon.svg" alt="" /><div><span>STARGAZER · LUNAR MISSION SIMULATOR</span><h1>MISSION 001 <i>GET A ROBOTIC LANDER TO THE MOON</i></h1></div></a><div className="clock-console"><div><small>MISSION ELAPSED TIME</small><strong>{clock(state.elapsed)}</strong></div><div className="clock-controls"><Button onClick={() => dispatch({ type: 'TOGGLE_PAUSE' })} disabled={state.phase === 'no-launch'}>{state.paused ? 'Resume clock' : 'Pause clock'}</Button><label>Speed<select value={state.speed} onChange={(event) => dispatch({ type: 'SET_SPEED', speed: event.target.value })}><option value="slow">Slow</option><option value="normal">Normal</option></select></label><Button onClick={openGuide}>Mission guide</Button></div></div></header>
-    {['assembly', 'assembly-complete', 'launchpad', 'countdown'].includes(state.phase) && <MissionTimeline state={state} dispatch={dispatch} />}
-    <div className="phase-heading"><div><span className="eyebrow">{info[0]}</span><h2>{info[1]}</h2><p>{info[2]}</p></div>{state.missionPlan ? <div className="mission-target"><span>PLANNED SURFACE OPPORTUNITY · NOT A LAUNCH WINDOW</span><b>{state.missionPlan.siteName}</b><small>{state.missionPlan.selectedWindow.startTime.slice(0, 16).replace('T', ' ')} UTC → {state.missionPlan.selectedWindow.endTime.slice(0, 16).replace('T', ' ')} UTC</small>{['assembly', 'launchpad', 'countdown'].includes(state.phase) && <small>PREPARATION DEADLINE {clock(state.missionPlan.preparationDeadlineSeconds)} · REMAINING {clock(Math.max(0, state.missionPlan.preparationDeadlineSeconds - state.elapsed)).replace('T+', '')}</small>}</div> : <label className="site-picker">DESTINATION<select value={site.id} onChange={(e) => dispatch({ type: 'SELECT_SITE', siteId: e.target.value, siteName: landingSites.find((s) => s.id === e.target.value)?.name })} disabled={!['assembly', 'assembly-complete', 'launchpad'].includes(state.phase)}>{landingSites.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}</div>
+    {showDebugWindow && <DebugStageWindow onClose={() => setShowDebugWindow(false)} onSelect={selectDebugStage} />}
+    {usesMissionScene && <Suspense fallback={<div className="mission-scene-background scene-loading" aria-hidden="true" />}><MissionScene3D phase={state.phase} elapsed={state.elapsed} installedParts={state.installedParts} selectedPart={state.selectedPart} pad={state.pad} ascent={state.ascent} landing={state.landing} transitElapsed={transitElapsed} onInstall={(partId, slotId) => dispatch({ type: 'INSTALL_PART', partId, slotId })} onSelectPart={(partId) => dispatch({ type: 'SELECT_PART', partId })} /></Suspense>}
+    <MissionHeader stageLabel={info[0]} stageTitle={info[1]} timeLabel="MISSION ELAPSED TIME" timeValue={clock(state.elapsed)} onStageLabelClick={onStageLabelClick} controls={<><Button onClick={() => dispatch({ type: 'TOGGLE_PAUSE' })} disabled={state.phase === 'no-launch'}>{state.paused ? 'Resume clock' : 'Pause clock'}</Button><label className="header-speed">SPEED<select value={state.speed} onChange={(event) => dispatch({ type: 'SET_SPEED', speed: event.target.value })}><option value="slow">Slow</option><option value="normal">Normal</option></select></label><Button onClick={openGuide}>Mission guide</Button></>} />
+    <div className="mission-context"><p>{info[2]}</p>{state.missionPlan ? <div className="mission-target"><span>PLANNED SURFACE OPPORTUNITY · NOT A LAUNCH WINDOW</span><b>{state.missionPlan.siteName}</b><small>{state.missionPlan.selectedWindow.startTime.slice(0, 16).replace('T', ' ')} UTC → {state.missionPlan.selectedWindow.endTime.slice(0, 16).replace('T', ' ')} UTC</small>{['assembly', 'launchpad', 'countdown'].includes(state.phase) && <small>PREPARATION DEADLINE {clock(state.missionPlan.preparationDeadlineSeconds)} · REMAINING {clock(Math.max(0, state.missionPlan.preparationDeadlineSeconds - state.elapsed)).replace('T+', '')}</small>}</div> : <label className="site-picker">DESTINATION<select value={site.id} onChange={(e) => dispatch({ type: 'SELECT_SITE', siteId: e.target.value, siteName: landingSites.find((s) => s.id === e.target.value)?.name })} disabled={!['assembly', 'assembly-complete', 'launchpad'].includes(state.phase)}>{landingSites.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}</div>
     {state.phase === 'assembly' || state.phase === 'assembly-complete' ? <Assembly state={state} dispatch={dispatch} /> : state.phase === 'launchpad' ? <LaunchPad state={state} dispatch={dispatch} /> : state.phase === 'countdown' ? <Countdown state={state} dispatch={dispatch} /> : state.phase === 'ascent' ? <Ascent state={state} dispatch={dispatch} /> : state.phase === 'transit' ? <Transit state={state} dispatch={dispatch} /> : state.phase === 'landing' ? <Landing state={state} dispatch={dispatch} /> : state.phase === 'lunar-operations' ? <LunarOperations state={state} dispatch={dispatch} site={site} conditions={conditions} simTime={simTime} /> : <section className="game-panel phase-panel no-launch-phase"><span className="eyebrow">MISSION SCHEDULE</span><h2>Preparation period ended</h2><p>The planned schedule reached its simplified preparation deadline before a launch. Return to planning to compare another recorded surface opportunity. This deadline is game scheduling only, not a real rocket launch time.</p><Button onClick={() => { dispatch({ type: 'RESTART' }); setShowGuide(false); }}>Return to planning</Button></section>}
   </main>;
 }

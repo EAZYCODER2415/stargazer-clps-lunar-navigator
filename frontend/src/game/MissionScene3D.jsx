@@ -87,7 +87,7 @@ function addLights(scene) {
   scene.add(fill);
 }
 
-function addHangar(scene, installedParts) {
+function addHangar(scene, installedParts, selectedPart) {
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(36, 30), material(0x151b27, { roughness: 0.88 }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, -0.04, -1);
@@ -109,23 +109,30 @@ function addHangar(scene, installedParts) {
 
   box(scene, [-4.9, 1.45, -0.8], [1.3, 2.9, 7.6], 0x0c111b);
   box(scene, [-4.9, 1.45, 3.05], [1.4, 0.2, 0.18], 0x53637c);
+  const partTargets = [];
   for (let i = 0; i < 8; i += 1) {
     const id = ['fairing', 'lander', 'payload-adapter', 'upper-tank', 'upper-engine', 'interstage', 'first-tank', 'first-engine'][i];
     const y = 0.5 + i * 0.77;
     const rack = new THREE.Group();
     scene.add(rack);
     rack.position.set(-4.55, y, 0.5);
+    rack.userData.partId = id;
+    rack.userData.rackPosition = rack.position.clone();
     const part = makePart(id, rack);
-    part.scale.setScalar(0.38);
+    part.scale.setScalar(selectedPart === id ? 0.48 : 0.38);
     if (installedParts.includes(id)) {
       rack.position.set(0, partSlots[id], 0);
+      delete rack.userData.partId;
       part.scale.setScalar(1);
+    } else {
+      partTargets.push(rack);
     }
   }
 
   box(scene, [0, 0.16, 0], [1.35, 0.18, 1.35], 0x59677d);
   for (const x of [-0.56, 0.56]) box(scene, [x, 0.9, 0], [0.055, 1.5, 0.055], 0x8995a8);
   for (const z of [-0.56, 0.56]) box(scene, [0, 0.9, z], [1.15, 1.5, 0.055], 0x8995a8);
+  return partTargets;
 }
 
 function addControlRoom(scene, pad) {
@@ -291,7 +298,7 @@ function addLandingScene(scene) {
   return { lander, earth };
 }
 
-export default function MissionScene3D({ phase, elapsed, installedParts = [], pad, ascent, landing, transitElapsed = 0, onInstall }) {
+export default function MissionScene3D({ phase, elapsed, installedParts = [], selectedPart, pad, ascent, landing, transitElapsed = 0, onInstall, onSelectPart }) {
   const mountRef = useRef(null);
   const frameState = useRef({});
   const installedKey = useMemo(() => [...installedParts].sort().join('|'), [installedParts]);
@@ -305,8 +312,8 @@ export default function MissionScene3D({ phase, elapsed, installedParts = [], pa
   }), [pad?.platformExtended, pad?.platformRetracted, pad?.fuelConnected, pad?.oxidizerConnected, pad?.propellantStartedAt, pad?.propellantLoaded]);
 
   useEffect(() => {
-    frameState.current = { elapsed, pad, ascent, landing, transitElapsed, onInstall };
-  }, [elapsed, pad, ascent, landing, transitElapsed, onInstall]);
+    frameState.current = { elapsed, pad, ascent, landing, selectedPart, transitElapsed, onInstall, onSelectPart };
+  }, [elapsed, pad, ascent, landing, selectedPart, transitElapsed, onInstall, onSelectPart]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -331,15 +338,22 @@ export default function MissionScene3D({ phase, elapsed, installedParts = [], pa
     const camera = new THREE.PerspectiveCamera(42, mount.clientWidth / Math.max(1, mount.clientHeight), 0.1, 100);
     let motion = {};
     let assemblyTarget = null;
+    let assemblyParts = [];
+    let assemblyGuide = null;
 
     if (phase.startsWith('assembly')) {
       camera.position.set(10.5, 7.5, 15.5);
       camera.lookAt(0, 4.1, 0);
-      addHangar(scene, installedKey ? installedKey.split('|') : []);
+      assemblyParts = addHangar(scene, installedKey ? installedKey.split('|') : [], selectedPart);
       assemblyTarget = new THREE.Mesh(new THREE.CylinderGeometry(0.92, 0.92, 7.8, 12), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
       assemblyTarget.position.y = 4;
       assemblyTarget.name = 'assembly-drop-target';
       scene.add(assemblyTarget);
+      assemblyGuide = new THREE.Mesh(new THREE.TorusGeometry(1.02, 0.045, 8, 36), new THREE.MeshBasicMaterial({ color: 0x4cc9f0, transparent: true, opacity: 0.9, depthWrite: false }));
+      assemblyGuide.rotation.x = Math.PI / 2;
+      assemblyGuide.position.y = 4;
+      assemblyGuide.visible = false;
+      scene.add(assemblyGuide);
     } else if (phase === 'launchpad' || phase === 'countdown') {
       camera.position.set(0, 3.8, 10.5);
       camera.lookAt(0, 4.1, -6.8);
@@ -362,27 +376,89 @@ export default function MissionScene3D({ phase, elapsed, installedParts = [], pa
     let disposed = false;
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
-    const onDragOver = (event) => {
-      if (!assemblyTarget) return;
-      event.preventDefault();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-    };
-    const onDrop = (event) => {
-      if (!assemblyTarget) return;
-      event.preventDefault();
-      const partId = event.dataTransfer?.getData('text/plain');
-      if (!partId) return;
+    let activeAssemblyDrag = null;
+    const updatePointer = (event) => {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObject(assemblyTarget, false)[0];
-      if (!hit) return;
-      const nearestSlot = Object.entries(partSlots).reduce((nearest, [slotId, y]) => Math.abs(y - hit.point.y) < Math.abs(nearest.y - hit.point.y) ? { slotId, y } : nearest, { slotId: '', y: 4 });
-      if (Math.abs(nearestSlot.y - hit.point.y) <= 0.72) frameState.current?.onInstall?.(partId, nearestSlot.slotId);
+      return rect;
     };
-    renderer.domElement.addEventListener('dragover', onDragOver);
-    renderer.domElement.addEventListener('drop', onDrop);
+    const onPointerDown = (event) => {
+      if (!assemblyTarget || event.button !== 0) return;
+      updatePointer(event);
+      const hit = raycaster.intersectObjects(assemblyParts.flatMap((part) => part.children), true)[0];
+      if (!hit) return;
+      let root = hit.object;
+      while (root && !root.userData.partId) root = root.parent;
+      if (!root?.userData.partId) return;
+      const partId = root.userData.partId;
+      frameState.current?.onSelectPart?.(partId);
+      const dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -root.position.z);
+      const point = raycaster.ray.intersectPlane(dragPlane, new THREE.Vector3());
+      if (!point) return;
+      activeAssemblyDrag = {
+        pointerId: event.pointerId,
+        partId,
+        root,
+        original: root.position.clone(),
+        offset: root.position.clone().sub(point),
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+      };
+      renderer.domElement.setPointerCapture(event.pointerId);
+      renderer.domElement.style.cursor = 'grabbing';
+      event.preventDefault();
+    };
+    const onPointerMove = (event) => {
+      if (!activeAssemblyDrag || activeAssemblyDrag.pointerId !== event.pointerId) {
+        if (assemblyTarget) {
+          updatePointer(event);
+          const hovered = raycaster.intersectObjects(assemblyParts.flatMap((part) => part.children), true).length > 0;
+          renderer.domElement.style.cursor = hovered ? 'grab' : 'default';
+        }
+        return;
+      }
+      updatePointer(event);
+      const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -activeAssemblyDrag.original.z);
+      const point = raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+      if (!point) return;
+      activeAssemblyDrag.root.position.set(point.x + activeAssemblyDrag.offset.x, point.y + activeAssemblyDrag.offset.y, activeAssemblyDrag.original.z);
+      activeAssemblyDrag.moved ||= Math.hypot(event.clientX - activeAssemblyDrag.startX, event.clientY - activeAssemblyDrag.startY) > 7;
+      const targetHit = raycaster.intersectObject(assemblyTarget, false)[0];
+      if (targetHit && assemblyGuide) {
+        const nearest = Object.entries(partSlots).reduce((result, [slotId, y]) => Math.abs(y - targetHit.point.y) < Math.abs(result.y - targetHit.point.y) ? { slotId, y } : result, { slotId: '', y: 4 });
+        assemblyGuide.visible = true;
+        assemblyGuide.position.y = nearest.y;
+        assemblyGuide.material.color.set(nearest.slotId === activeAssemblyDrag.partId ? 0x4cc9f0 : 0xfbbf24);
+      } else if (assemblyGuide) assemblyGuide.visible = false;
+    };
+    const onPointerUp = (event) => {
+      if (!activeAssemblyDrag || activeAssemblyDrag.pointerId !== event.pointerId) return;
+      const drag = activeAssemblyDrag;
+      activeAssemblyDrag = null;
+      if (assemblyGuide) assemblyGuide.visible = false;
+      renderer.domElement.style.cursor = 'default';
+      if (!drag.moved) {
+        frameState.current?.onSelectPart?.(drag.partId);
+        return;
+      }
+      updatePointer(event);
+      const hit = raycaster.intersectObject(assemblyTarget, false)[0];
+      if (hit) {
+        const nearestSlot = Object.entries(partSlots).reduce((nearest, [slotId, y]) => Math.abs(y - hit.point.y) < Math.abs(nearest.y - hit.point.y) ? { slotId, y } : nearest, { slotId: '', y: 4 });
+        const partSlot = drag.partId;
+        if (Math.abs(nearestSlot.y - hit.point.y) <= 0.82 && Math.hypot(hit.point.x, hit.point.z) < 1.35) {
+          frameState.current?.onInstall?.(partSlot, nearestSlot.slotId);
+        }
+      }
+      drag.root.position.copy(drag.original);
+    };
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
+    renderer.domElement.addEventListener('pointerup', onPointerUp);
+    renderer.domElement.addEventListener('pointercancel', onPointerUp);
     const resize = new ResizeObserver(() => {
       if (!mount.clientWidth || !mount.clientHeight) return;
       camera.aspect = mount.clientWidth / mount.clientHeight;
@@ -393,6 +469,7 @@ export default function MissionScene3D({ phase, elapsed, installedParts = [], pa
     const animate = () => {
       if (disposed) return;
       const current = frameState.current || {};
+      if (assemblyParts.length) assemblyParts.forEach((part) => part.children[0]?.scale.setScalar(current.selectedPart === part.userData.partId ? 0.48 : 0.38));
       if (phase === 'ascent' && motion.rocket) {
         const flightTime = Math.max(0, current.elapsed - (current.ascent?.launchedAt || 0));
         motion.rocket.position.y = Math.min(4.8, flightTime * 0.021);
@@ -431,8 +508,10 @@ export default function MissionScene3D({ phase, elapsed, installedParts = [], pa
       disposed = true;
       cancelAnimationFrame(frame);
       resize.disconnect();
-      renderer.domElement.removeEventListener('dragover', onDragOver);
-      renderer.domElement.removeEventListener('drop', onDrop);
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+      renderer.domElement.removeEventListener('pointermove', onPointerMove);
+      renderer.domElement.removeEventListener('pointerup', onPointerUp);
+      renderer.domElement.removeEventListener('pointercancel', onPointerUp);
       scene.traverse((object) => {
         if (object.geometry) object.geometry.dispose();
         if (object.material) {

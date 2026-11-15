@@ -124,6 +124,87 @@ function transition(state, phase, title, detail) {
   return logEvent({ ...state, phase }, title, detail);
 }
 
+function createDebugStageState(state, phase) {
+  const phases = ['planning', 'assembly', 'assembly-complete', 'launchpad', 'countdown', 'ascent', 'transit', 'landing', 'lunar-operations', 'no-launch'];
+  if (!phases.includes(phase)) return state;
+  if (phase === 'planning') return createInitialState();
+
+  const elapsedByPhase = { assembly: 0, 'assembly-complete': 30, launchpad: 120, countdown: 420, ascent: 450, transit: 620, landing: 820, 'lunar-operations': 920, 'no-launch': SCENARIO_END };
+  const elapsed = elapsedByPhase[phase];
+  const missionPlan = state.missionPlan || {
+    siteId: state.siteId,
+    siteName: 'Debug mission site',
+    selectedWindow: {
+      startTime: SCENARIO_START.toISOString(),
+      endTime: new Date(SCENARIO_START.getTime() + 3 * 60 * 60 * 1000).toISOString(),
+    },
+    preparationDeadlineSeconds: SCENARIO_END,
+  };
+  const allParts = ASSEMBLY_COMPONENTS.map((part) => part.id);
+  const windowId = LAUNCH_WINDOWS[0].id;
+  const padReady = {
+    ...initialPad(),
+    platformExtended: true,
+    fuelConnected: true,
+    oxidizerConnected: true,
+    propellantStartedAt: 0,
+    propellantLoaded: true,
+    checks: { vehicle: true, spacecraft: true, site: true },
+    platformRetracted: true,
+    onboardPower: true,
+    weatherChoice: { [windowId]: 'go' },
+    weatherAssessment: { [windowId]: { choice: 'go', correct: true } },
+    countdownStartedAt: phase === 'countdown' ? elapsed - COUNTDOWN_SECONDS + 8 : null,
+  };
+  const ascentStart = elapsed - 30;
+  const transitStart = elapsed - 30;
+  const landingStart = elapsed - 30;
+  const questions = RADIO_QUESTIONS.map((item) => ({
+    id: item.id,
+    status: item.due <= 30 ? 'pending' : 'scheduled',
+    answer: null,
+    feedback: '',
+  }));
+  const next = {
+    ...state,
+    elapsed,
+    paused: true,
+    briefingOpen: false,
+    phase,
+    missionPlan,
+    installedParts: phase === 'assembly' ? [] : allParts,
+    assemblyFeedback: '',
+    pad: phase === 'assembly' || phase === 'assembly-complete' || phase === 'launchpad' ? initialPad() : padReady,
+    usedWindowId: ['ascent', 'transit', 'landing', 'lunar-operations'].includes(phase) ? windowId : null,
+    launch: ['ascent', 'transit', 'landing', 'lunar-operations'].includes(phase) ? { time: ascentStart, windowId } : null,
+    ascent: ['ascent', 'transit', 'landing', 'lunar-operations'].includes(phase) ? {
+      launchedAt: ascentStart,
+      separatedAt: phase === 'ascent' ? null : ascentStart + 25,
+      separationPenalty: 0,
+      recoveryUsed: false,
+      fairingSeparated: phase !== 'ascent',
+      payloadSeparated: ['transit', 'landing', 'lunar-operations'].includes(phase),
+      separationWindowNotified: true,
+      fairingNotified: true,
+      payloadNotified: true,
+    } : null,
+    transit: ['transit', 'landing', 'lunar-operations'].includes(phase) ? { startedAt: transitStart, questions } : null,
+    landing: ['landing', 'lunar-operations'].includes(phase) ? {
+      zone: phase === 'lunar-operations' ? 'B' : '',
+      descentStartedAt: phase === 'landing' ? null : landingStart,
+      thrustAdjusted: phase === 'lunar-operations',
+      alignmentComplete: phase === 'lunar-operations',
+      touchdown: phase === 'lunar-operations',
+      result: phase === 'lunar-operations' ? 'nominal' : null,
+      feedback: '',
+    } : { zone: '', descentStartedAt: null, thrustAdjusted: false, alignmentComplete: false, touchdown: false, result: null, feedback: '' },
+    lunarOps: phase === 'lunar-operations'
+      ? { startedAt: elapsed, roverDeployed: false, surveyStartedAt: null, surveyComplete: false, surveyResult: null, surveyReadyNotified: false }
+      : { startedAt: null, roverDeployed: false, surveyStartedAt: null, surveyComplete: false, surveyResult: null, surveyReadyNotified: false },
+  };
+  return logEvent(next, 'Debug stage loaded', `Debug tools loaded the ${phase} stage with a paused mission clock.`);
+}
+
 function windowEvents(state, nextElapsed) {
   const events = [];
   let openedWindows = state.openedWindows;
@@ -146,6 +227,8 @@ function windowEvents(state, nextElapsed) {
 
 export function reducer(state, action) {
   switch (action.type) {
+    case 'DEBUG_SET_STAGE':
+      return createDebugStageState(state, action.phase);
     case 'COMMIT_MISSION_PLAN': {
       const plan = action.plan;
       if (state.phase !== 'planning' || !plan || !Array.isArray(plan.records) || plan.records.length !== 3) return state;
