@@ -508,3 +508,54 @@
   .lunar-game .pad-phase > .corridor-panel { max-height:46vh; }
   .lunar-game .corridor-monitor { min-height:230px; }
 }
+
+/* 03 Ascent: what the vehicle is doing now, and a live bar of the four ascent points. */
+.lunar-game .ascent-stage-now { margin:10px 0 0; padding:10px 12px; border:1px solid #41516bbd; border-left:2px solid var(--game-cyan); border-radius:3px; background:#0a1420e6; }
+.lunar-game .ascent-stage-now b { display:block; color:var(--game-cyan); font-size:10px; letter-spacing:.12em; }
+.lunar-game .ascent-stage-now p { margin:5px 0 0; min-height:4.5em; color:#c8d5e6; font-size:12px; line-height:1.5; }
+.lunar-game .ascent-timeline { position:relative; height:4px; margin:18px 6px 30px; border-radius:2px; background:#2b364a; }
+.lunar-game .ascent-timeline .fill { position:absolute; inset:0 auto 0 0; border-radius:2px; background:var(--game-cyan); }
+.lunar-game .ascent-timeline .now { position:absolute; top:50%; width:11px; height:11px; border:2px solid var(--game-cyan); border-radius:50%; background:#f5f7ff; box-shadow:0 0 9px #4cc9f0cc; transform:translate(-50%,-50%); }
+.lunar-game .ascent-timeline span { position:absolute; top:-4px; width:2px; height:12px; background:#66758c; transform:translateX(-50%); }
+.lunar-game .ascent-timeline span em { position:absolute; top:16px; left:50%; color:var(--game-dim); font:8px ui-monospace,SFMono-Regular,Consolas,monospace; font-style:normal; letter-spacing:.06em; white-space:nowrap; transform:translateX(-50%); }
+.lunar-game .ascent-timeline span:first-of-type em { left:-1px; transform:none; }
+.lunar-game .ascent-timeline span:nth-of-type(2) em { left:3px; transform:none; }
+.lunar-game .ascent-timeline span:last-of-type em { right:-7px; left:auto; transform:none; }
+.lunar-game .ascent-timeline span.due { background:var(--game-gold); }
+.lunar-game .ascent-timeline span.due em { color:var(--game-gold); }
+.lunar-game .ascent-timeline span.done { background:var(--game-green); }
+.lunar-game .ascent-timeline span.done em { color:var(--game-green); }
+
+/* 04 Transit: the console keeps one height, whether or not a question is waiting. */
+.lunar-game .transit-console #transit-panel-body { height:236px; overflow:auto; scrollbar-width:thin; scrollbar-color:#3a4a60 transparent; }
+
+/* 05 Landing: steering gauge for the A and D minigame. */
+.lunar-game .steer-gauge { margin:12px 0; padding:10px 12px; border:1px solid #40516ab8; border-radius:3px; background:#091420e8; }
+.lunar-game .steer-gauge > div:first-child { display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 8px; color:var(--game-muted); font-size:10px; }
+.lunar-game .steer-gauge b { color:var(--game-gold); font:700 10px ui-monospace,SFMono-Regular,Consolas,monospace; }
+.lunar-game .steer-gauge.on-target b { color:var(--game-green); }
+.lunar-game .steer-track { position:relative; height:10px; margin:10px 0; border-radius:5px; background:#1b2434; }
+.lunar-game .steer-track .band { position:absolute; top:0; bottom:0; left:50%; border-radius:5px; background:#6ee7b74d; box-shadow:inset 0 0 0 1px #6ee7b7; transform:translateX(-50%); }
+.lunar-game .steer-track .mark { position:absolute; top:50%; width:14px; height:14px; border:2px solid #07111e; border-radius:50%; background:var(--game-gold); transform:translate(-50%,-50%); }
+.lunar-game .steer-gauge.on-target .steer-track .mark { background:var(--game-green); }
+.lunar-game .steer-keys { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:8px; }
+.lunar-game .steer-keys small { color:var(--game-dim); font-size:9px; letter-spacing:.12em; text-align:center; }
+.lunar-game .steer-keys .game-button { min-width:62px; touch-action:none; user-select:none; }
+
+/* 06 Lunar operations: the surface view is the hero; readings and actions in a side console. */
+.lunar-game.game-phase-lunar-operations > .game-panel.lunar-phase { display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,340px); grid-template-rows:minmax(0,1fr); gap:12px; padding:0; overflow:hidden; }
+.lunar-game .lunar-phase > .lunar-scene-frame { height:auto; min-height:0; margin:0; }
+.lunar-game .lunar-phase > .lunar-console { align-self:start; max-height:100%; }
+.lunar-game .lunar-console .science-grid { grid-template-columns:1fr; gap:8px; margin:12px 0 8px; }
+.lunar-game .lunar-console .science-grid article { gap:5px; padding:11px 12px; }
+.lunar-game .lunar-console .sim-time { margin:6px 0 10px; }
+.lunar-game .lunar-console .science-caveat { margin:0; padding:9px 10px; border-left:2px solid var(--game-blue); color:var(--game-muted); background:#101a28; font-size:10.5px; line-height:1.5; }
+.lunar-game .lunar-console .descent-meter { margin:0 0 10px; }
+.lunar-game .lunar-console .mission-complete { margin:0 0 4px; padding:14px; }
+.lunar-game .lunar-console > .primary-action,
+.lunar-game .lunar-console .mission-complete .game-button { width:100%; }
+@media (max-width:820px) {
+  .lunar-game.game-phase-lunar-operations > .game-panel.lunar-phase { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(46%,1fr) auto; }
+  .lunar-game .lunar-phase > .lunar-console { max-height:40vh; }
+  .lunar-game .transit-console #transit-panel-body { height:300px; }
+}

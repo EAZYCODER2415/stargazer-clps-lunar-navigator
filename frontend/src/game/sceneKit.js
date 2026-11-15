@@ -352,9 +352,9 @@ export function makeEarth(parent, radius, detail = 512, soft = false) {
   const haze = new THREE.Mesh(
     new THREE.SphereGeometry(radius * 1.12, segments, segments / 2),
     new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(0x5aa9ff) } },
+      uniforms: { uColor: { value: new THREE.Color(0x5aa9ff) }, uOpacity: { value: 1 } },
       vertexShader: 'varying vec3 vNormal; varying vec3 vView; void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vNormal = normalize(normalMatrix * normal); vView = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
-      fragmentShader: 'uniform vec3 uColor; varying vec3 vNormal; varying vec3 vView; void main() { float rim = clamp(-dot(normalize(vNormal), normalize(vView)) / 0.45, 0.0, 1.0); gl_FragColor = vec4(uColor, pow(rim, 2.4) * 0.6); }',
+      fragmentShader: 'uniform vec3 uColor; uniform float uOpacity; varying vec3 vNormal; varying vec3 vView; void main() { float rim = clamp(-dot(normalize(vNormal), normalize(vView)) / 0.45, 0.0, 1.0); gl_FragColor = vec4(uColor, pow(rim, 2.4) * 0.6 * uOpacity); }',
       side: THREE.BackSide,
       transparent: true,
       blending: THREE.AdditiveBlending,
@@ -362,7 +362,7 @@ export function makeEarth(parent, radius, detail = 512, soft = false) {
     }),
   );
   group.add(haze);
-  return { group, globe, cloudLayer };
+  return { group, globe, cloudLayer, haze };
 }
 
 /** The Moon with dark plains and rimmed craters. */

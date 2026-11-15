@@ -79,7 +79,7 @@ export function createInitialState() {
     debug: null,
     ascent: null,
     transit: null,
-    landing: { zone: '', descentStartedAt: null, thrustAdjusted: false, alignmentComplete: false, touchdown: false, result: null, feedback: '' },
+    landing: initialLanding(),
     lunarOps: { startedAt: null, roverDeployed: false, surveyStartedAt: null, surveyComplete: false, surveyResult: null },
     educationScore: 0,
     activity: [{ time: 0, title: 'Mission control ready', detail: 'Mission 001 begins paused. Assemble the generic robotic lunar vehicle, prepare the launch pad, then manage the mission through landing and the first rover survey.' }],
@@ -175,7 +175,16 @@ export function getStageIndex(phase) {
   return STAGE_OF_PHASE[phase] ?? 0;
 }
 
-const initialLanding = () => ({ zone: '', descentStartedAt: null, thrustAdjusted: false, alignmentComplete: false, touchdown: false, result: null, feedback: '' });
+// Powered descent steering. Positions are in landing-scene units along the row of zones.
+export const LANDING_ZONE_X = { A: -5, B: 0, C: 5 };
+export const LANDER_START_X = -2.5;
+export const LANDING_TOLERANCE = 0.8; // how far from the zone centre still counts as inside it
+// Unannounced sideways kicks during the descent: [seconds after descent start, change in drift speed].
+// Fixed, so every descent is the same test, but never shown to the player in advance.
+const LANDER_NUDGES = [[14, 0.9], [31, -1.1], [47, 1], [62, -0.8], [76, 1.2]];
+const LANDER_THRUST = 1.6;
+const LANDER_DAMPING = 1.2;
+const initialLanding = () => ({ zone: '', descentStartedAt: null, thrustAdjusted: false, alignmentComplete: false, touchdown: false, result: null, feedback: '', x: LANDER_START_X, vx: 0, steer: 0 });
 const initialLunarOps = () => ({ startedAt: null, roverDeployed: false, surveyStartedAt: null, surveyComplete: false, surveyResult: null });
 
 // A clearly labelled stand-in for a Stage 0 plan. Fixed values so every debug run is the same.
@@ -234,7 +243,7 @@ export function createDebugStageState(state, stageId, siteName) {
   if (target === 6) {
     const realLanding = Boolean(state.landing?.touchdown);
     if (!realLanding) generated.push('Landing outcome (nominal touchdown, zone B)');
-    next.landing = realLanding ? state.landing : { ...initialLanding(), zone: 'B', descentStartedAt: elapsed, thrustAdjusted: true, alignmentComplete: true, touchdown: true, result: 'nominal', debug: true };
+    next.landing = realLanding ? state.landing : { ...initialLanding(), zone: 'B', x: LANDING_ZONE_X.B, descentStartedAt: elapsed, thrustAdjusted: true, alignmentComplete: true, touchdown: true, result: 'nominal', debug: true };
     next.lunarOps = { ...initialLunarOps(), startedAt: elapsed };
   }
   next.debug = { stage: stageId, generated: [...new Set([...(state.debug?.generated || []).filter((item) => missionPlan.debug || !item.startsWith('Stage 0')), ...generated])] };
@@ -385,19 +394,22 @@ export function reducer(state, action) {
       return { ...state, landing: { ...state.landing, zone: action.zone, feedback: '' } };
     case 'BEGIN_DESCENT':
       if (state.phase !== 'landing' || !state.landing.zone || state.landing.descentStartedAt !== null) return { ...state, landing: { ...state.landing, feedback: 'Select a schematic landing zone before beginning descent.' } };
-      return logEvent({ ...state, landing: { ...state.landing, descentStartedAt: state.elapsed, feedback: '' } }, 'Powered descent started', `Lander is descending toward schematic zone ${state.landing.zone}. Terrain hazard labels are game scenario cues, not a landing-safety assessment.`);
+      return logEvent({ ...state, landing: { ...state.landing, descentStartedAt: state.elapsed, x: LANDER_START_X, vx: 0, steer: 0, feedback: '' } }, 'Powered descent started', `Lander is descending toward schematic zone ${state.landing.zone}. Terrain hazard labels are game scenario cues, not a landing-safety assessment.`);
     case 'ADJUST_THRUST':
       if (state.phase !== 'landing' || state.landing.descentStartedAt === null || state.landing.thrustAdjusted) return state;
       if (state.elapsed < state.landing.descentStartedAt + 20) return { ...state, landing: { ...state.landing, feedback: 'Wait for the lower-altitude thrust cue.' } };
       return logEvent({ ...state, landing: { ...state.landing, thrustAdjusted: true, feedback: 'Descent thrust adjusted. Continue monitoring altitude.' } }, 'Descent thrust adjusted', 'The player confirmed the simulated lower-altitude burn cue.');
-    case 'ALIGN_LANDER':
-      if (state.phase !== 'landing' || state.landing.descentStartedAt === null || state.landing.alignmentComplete || !state.landing.thrustAdjusted) return state;
-      if (state.elapsed < state.landing.descentStartedAt + 48) return { ...state, landing: { ...state.landing, feedback: 'Complete the thrust adjustment before aligning over the landing zone.' } };
-      return logEvent({ ...state, landing: { ...state.landing, alignmentComplete: true, feedback: 'Lander aligned with the selected schematic zone.' } }, 'Lander aligned over target zone', 'Final descent alignment is complete. Prepare to confirm touchdown.');
+    case 'SET_LANDER_STEER': {
+      // The player holds A or D: -1 steers left, 1 steers right, 0 lets go.
+      const steer = action.direction < 0 ? -1 : action.direction > 0 ? 1 : 0;
+      if (state.phase !== 'landing' || state.landing.descentStartedAt === null || state.landing.steer === steer) return state;
+      return { ...state, landing: { ...state.landing, steer } };
+    }
     case 'CONFIRM_TOUCHDOWN': {
       if (state.phase !== 'landing' || state.landing.descentStartedAt === null || state.elapsed < state.landing.descentStartedAt + LANDING_DURATION_SECONDS) return { ...state, landing: { ...state.landing, feedback: 'Touchdown confirmation is available after the descent reaches the surface.' } };
-      const result = state.landing.zone === 'B' && state.landing.thrustAdjusted && state.landing.alignmentComplete ? 'nominal' : 'rough';
-      return logEvent({ ...state, phase: 'lunar-operations', landing: { ...state.landing, touchdown: true, result, feedback: '' }, lunarOps: { ...state.lunarOps, startedAt: state.elapsed, roverDeployed: false } }, result === 'nominal' ? 'Lunar touchdown confirmed' : 'Lunar touchdown confirmed · rough landing', result === 'nominal' ? `The lander touched down at ${action.siteName || state.missionPlan?.siteName || 'the selected candidate site'}. The schematic safe-zone selection and both descent actions were completed.` : `The lander reached ${action.siteName || state.missionPlan?.siteName || 'the selected candidate site'}, but the scenario indicates a rough landing. The first robotic operation remains possible.`);
+      const alignmentComplete = Math.abs(state.landing.x - LANDING_ZONE_X[state.landing.zone]) <= LANDING_TOLERANCE;
+      const result = state.landing.zone === 'B' && state.landing.thrustAdjusted && alignmentComplete ? 'nominal' : 'rough';
+      return logEvent({ ...state, phase: 'lunar-operations', landing: { ...state.landing, touchdown: true, alignmentComplete, steer: 0, result, feedback: '' }, lunarOps: { ...state.lunarOps, startedAt: state.elapsed, roverDeployed: false } }, result === 'nominal' ? 'Lunar touchdown confirmed' : 'Lunar touchdown confirmed · rough landing', result === 'nominal' ? `The lander touched down at ${action.siteName || state.missionPlan?.siteName || 'the selected candidate site'}. The schematic safe-zone selection and both descent actions were completed.` : `The lander reached ${action.siteName || state.missionPlan?.siteName || 'the selected candidate site'}, but the scenario indicates a rough landing. The first robotic operation remains possible.`);
     }
     case 'DEPLOY_ROVER':
       if (state.phase !== 'lunar-operations' || state.lunarOps.roverDeployed) return state;
@@ -480,13 +492,20 @@ export function reducer(state, action) {
 
       if (state.phase === 'landing' && state.landing.descentStartedAt !== null) {
         const sinceDescent = elapsed - state.landing.descentStartedAt;
+        // Sideways motion until touchdown: the player's steering, drag, and the unannounced nudges.
+        const flightEnd = Math.min(sinceDescent, LANDING_DURATION_SECONDS);
+        let { x, vx } = state.landing;
+        for (let at = state.elapsed - state.landing.descentStartedAt; flightEnd - at > 1e-9;) {
+          const step = Math.min(0.1, flightEnd - at);
+          for (const [time, kick] of LANDER_NUDGES) if (at < time && at + step >= time) vx += kick;
+          vx += (state.landing.steer * LANDER_THRUST - vx * LANDER_DAMPING) * step;
+          x = Math.min(8, Math.max(-8, x + vx * step));
+          at += step;
+        }
+        next.landing = { ...next.landing, x, vx: sinceDescent >= LANDING_DURATION_SECONDS ? 0 : vx };
         if (!state.landing.thrustAdjusted && sinceDescent >= 20 && state.landing.feedback !== 'thrust-prompted') {
           next.landing = { ...next.landing, feedback: 'thrust-prompted' };
           events.push({ time: state.landing.descentStartedAt + 20, title: 'Lower-altitude thrust cue', detail: 'Review the descent indicator and adjust thrust for the final approach.' });
-        }
-        if (state.landing.thrustAdjusted && !state.landing.alignmentComplete && sinceDescent >= 48 && state.landing.feedback !== 'alignment-prompted') {
-          next.landing = { ...next.landing, feedback: 'alignment-prompted' };
-          events.push({ time: state.landing.descentStartedAt + 48, title: 'Landing-zone alignment cue', detail: 'Confirm alignment over the selected schematic zone.' });
         }
         if (sinceDescent >= LANDING_DURATION_SECONDS && !state.landing.touchdown && state.landing.feedback !== 'touchdown-prompted') {
           next.landing = { ...next.landing, feedback: 'touchdown-prompted' };
