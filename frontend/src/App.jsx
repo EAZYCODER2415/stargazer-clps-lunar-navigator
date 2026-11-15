@@ -17,11 +17,16 @@ import './styles/horizonTracker.css';
 import CompareView from './components/CompareView';
 import HelpCard from './components/HelpCard';
 import landingSites from './data/landingSites.json';
+import { House, SlidersHorizontal } from 'lucide-react';
+import { goHome, hashFor, parseHash } from './routes';
+import './styles/appNav.css';
 
 const LUNAR_DAY_MS = 29.53 * 86400000;
-const PLAN_HASH = '#plan';
+const siteById = (id) => landingSites.find((site) => site.id === id);
 
 function App() {
+  // The address this page was opened with: #explore, #casual or #plan, optionally naming a site (#explore/shackleton).
+  const [startRoute] = useState(parseHash);
   const initialTime = new Date('2026-12-01T00:00:00Z');
   const [time, setTime] = useState(initialTime);
   const [windowStart] = useState(initialTime);
@@ -34,31 +39,55 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeWarp, setTimeWarp] = useState(1); // 1x speed
   const [activeTool, setActiveTool] = useState('view-modes');
-  const [selectedSite, setSelectedSite] = useState(landingSites[0]);
+  const [selectedSite, setSelectedSite] = useState(() => siteById(startRoute.siteId) || landingSites[0]);
   const [viewMode, setViewMode] = useState('surface'); // 'surface' or 'free'
   const [cameraPan, setCameraPan] = useState({ yaw: 0, pitch: 0 });
-  const [showSolarFlux, setShowSolarFlux] = useState(true);
-  const [showDTELink, setShowDTELink] = useState(true);
-  const [showGrid, setShowGrid] = useState(true);
+  const [showSolarFlux, setShowSolarFlux] = useState(startRoute.mode !== 'casual');
+  const [showDTELink, setShowDTELink] = useState(startRoute.mode !== 'casual');
+  const [showGrid, setShowGrid] = useState(startRoute.mode !== 'casual');
   const [showHorizonMask, setShowHorizonMask] = useState(false);   // survey grid over the ground: off until asked for
   const [invertLook, setInvertLook] = useState(false);
-  // The Compare sites view ("Plan") follows the URL: #plan opens it, so a home page button can link straight to it.
-  const [showComparison, setShowComparison] = useState(() => window.location.hash === PLAN_HASH);
+  // The Compare sites view ("Plan") follows the URL: #plan opens it, so the home page can link straight to it.
+  const [showComparison, setShowComparison] = useState(startRoute.mode === 'plan');
+  // Casual mode (#casual) is this same app opened clean: the panels, the readouts, the sky grid and
+  // the Sun / Earth path lines start hidden, and one button brings the full tools back by moving to #explore.
+  const [casual, setCasual] = useState(startRoute.mode === 'casual');
+  const [showInterface, setShowInterface] = useState(startRoute.mode !== 'casual');
   useEffect(() => {
-    const onHashChange = () => setShowComparison(window.location.hash === PLAN_HASH);
+    const onHashChange = () => {
+      const route = parseHash();
+      if (route.mode === 'home') return;      // Root is about to swap this page for the home page
+      setShowComparison(route.mode === 'plan');
+      setCasual(route.mode === 'casual');
+      setShowInterface(route.mode !== 'casual');
+      setShowGrid(route.mode !== 'casual');
+      setShowSolarFlux(route.mode !== 'casual');
+      setShowDTELink(route.mode !== 'casual');
+      const site = siteById(route.siteId);
+      if (site) setSelectedSite(site);
+    };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
   const openComparison = useCallback(() => {
-    window.history.replaceState(null, '', PLAN_HASH);
+    window.history.replaceState(null, '', hashFor('plan'));
     setShowComparison(true);
   }, []);
   const closeComparison = useCallback(() => {
-    // Clear the hash without leaving a "#" behind or adding a history entry.
-    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    // Back to the full tools. The hash stays at #explore (never empty, which is the home page),
+    // and no history entry is added.
+    window.history.replaceState(null, '', hashFor('explore'));
     setShowComparison(false);
   }, []);
-  const [showInterface, setShowInterface] = useState(true);
+  const showFullTools = useCallback(() => {
+    window.location.hash = hashFor('explore', parseHash().siteId);      // the hashchange handler above does the rest
+  }, []);
+  const handleSiteChange = useCallback((site) => {
+    setSelectedSite(site);
+    // If the address names a site, keep it true so a refresh returns to the site now shown.
+    const route = parseHash();
+    if (route.siteId) window.history.replaceState(null, '', hashFor(route.mode, site.id));
+  }, []);
   const [cameraSensitivity, setCameraSensitivity] = useState(1.8);
   const [cameraInfo, setCameraInfo] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -252,7 +281,7 @@ function App() {
             <Header
               time={time}
               selectedSite={selectedSite}
-              onSiteChange={setSelectedSite}
+              onSiteChange={handleSiteChange}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               onHelpClick={() => setShowHelp((visible) => !visible)}
@@ -275,8 +304,21 @@ function App() {
           sensitivity={cameraSensitivity}
           isHidden={!showInterface}
         />
+        {casual && (
+          <div className="casual-bar">
+            <a className="casual-bar-home" href="/" onClick={goHome} title="Back to the Stargazer home page">
+              <House aria-hidden="true" />
+              Home
+            </a>
+            <span className="casual-bar-note">{selectedSite.name} · drag, or use the arrow keys, to look around</span>
+            <button type="button" className="casual-bar-tools" onClick={showFullTools}>
+              <SlidersHorizontal aria-hidden="true" />
+              Show full tools
+            </button>
+          </div>
+        )}
         {/* Right Vertical Tool Dock */}
-        <ToolDock
+        {!casual && <ToolDock
           activeTool={activeTool}
           onToolChange={setActiveTool}
           showSolarFlux={showSolarFlux}
@@ -291,7 +333,7 @@ function App() {
           onToggleInterface={() => setShowInterface((visible) => !visible)}
           cameraSensitivity={cameraSensitivity}
           onCameraSensitivityChange={setCameraSensitivity}
-        />
+        />}
 
         {showInterface && (
           <>

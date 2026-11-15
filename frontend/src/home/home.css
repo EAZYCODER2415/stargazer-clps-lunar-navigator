@@ -1,0 +1,791 @@
+/* Home page: a title screen. A start menu of three words on the left, an oversized Moon running
+   off the right edge, and the date controls as an instrument strip along the bottom.
+
+   Sizes are in px, and every element is styled in full, because the 3D app's stylesheet stays
+   loaded after a visit there and changes the root font size, hides page overflow and resets
+   spacing. The page scrolls inside .home-page for the same reason.
+
+   Type is DIN, the lettering of instrument panels and signage, taken from fonts already on the
+   visitor's machine (Bahnschrift on Windows, DIN Condensed on Apple), so nothing is downloaded. */
+
+.home-page {
+  --ink: #05060a;
+  --text: #e6e9f5;
+  --bright: #f5f7ff;
+  --muted: #949db3;
+  --dim: #5d667c;
+  --line: rgba(148, 163, 184, 0.2);
+  --cyan: #4cc9f0;
+  --sun: #fbbf24;
+  --display: 'Bahnschrift', 'DIN Condensed', 'Roboto Condensed', 'Arial Narrow', sans-serif-condensed, 'Helvetica Neue', Arial, sans-serif;
+  --body: 'Bahnschrift', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --mono: ui-monospace, 'Cascadia Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --swift: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  position: fixed;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--ink);
+  color: var(--text);
+  font: 400 16px/1.5 var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.home-page *,
+.home-page *::before,
+.home-page *::after {
+  box-sizing: border-box;
+}
+
+/* ---------- Frame ---------- */
+
+.home-shell {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'top'
+    'lede'
+    'menu'
+    'moon'
+    'hud'
+    'footer';
+  row-gap: 22px;
+  min-height: 100%;
+  padding: 24px 20px 16px;
+  overflow: hidden;
+  overflow: clip;
+}
+
+/* A faint survey grid that fades out toward the Moon. */
+.home-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.075) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.075) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(120% 95% at 0% 42%, #000 0%, transparent 60%);
+  mask-image: radial-gradient(120% 95% at 0% 42%, #000 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* Corner marks, like the frame of a viewfinder. */
+.home-shell::after {
+  --mark: rgba(148, 163, 184, 0.5);
+
+  content: '';
+  position: absolute;
+  inset: 10px;
+  z-index: 5;
+  background:
+    linear-gradient(var(--mark), var(--mark)) top left / 16px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top left / 1px 16px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top right / 16px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top right / 1px 16px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom left / 16px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom left / 1px 16px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom right / 16px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom right / 1px 16px no-repeat;
+  pointer-events: none;
+}
+
+.home-top,
+.home-lede,
+.home-menu,
+.home-footer {
+  position: relative;
+  z-index: 2;
+  animation: home-rise 0.8s var(--swift) both;
+}
+
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* ---------- Title ---------- */
+
+.home-top {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  justify-self: start;
+  gap: 12px;
+}
+
+.home-top img {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.home-top h1 {
+  margin: 0;
+  color: var(--bright);
+  font: 600 19px/1 var(--body);
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+
+.home-top span {
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font: 500 11px/1.3 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.home-lede {
+  grid-area: lede;
+  justify-self: start;
+  max-width: 25em;
+  margin: 0;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.5;
+  text-wrap: balance;
+  animation-delay: 0.08s;
+}
+
+/* ---------- Start menu ---------- */
+
+.home-menu {
+  --word: clamp(52px, 15.5vw, 78px);
+
+  grid-area: menu;
+  display: flex;
+  flex-direction: column;
+  animation-delay: 0.16s;
+}
+
+.home-menu-item {
+  display: grid;
+  grid-template-columns: 36px auto minmax(0, 1fr);
+  grid-template-areas:
+    'index word arrow'
+    '.     hint hint';
+  align-items: start;
+  padding: 12px 0 14px;
+  border-top: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.home-menu-item:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.home-menu-index {
+  grid-area: index;
+  padding-top: calc(var(--word) * 0.1);
+  color: var(--cyan);
+  font: 600 11px/1 var(--mono);
+  letter-spacing: 0.14em;
+}
+
+.home-menu-word {
+  grid-area: word;
+  color: var(--bright);
+  font: 700 var(--word) / 0.9 var(--display);
+  font-stretch: 75%;
+  letter-spacing: 0.012em;
+  text-transform: uppercase;
+}
+
+.home-menu-arrow {
+  grid-area: arrow;
+  align-self: center;
+  justify-self: end;
+  width: 26px;
+  height: 26px;
+  color: var(--cyan);
+}
+
+.home-menu-hint {
+  grid-area: hint;
+  max-width: 30em;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.home-menu-hint b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.home-page a:focus-visible,
+.home-page button:focus-visible,
+.home-page input:focus-visible {
+  outline: 2px solid #66d9ff;
+  outline-offset: 3px;
+}
+
+.home-page .home-menu-item:focus-visible {
+  outline: none;
+}
+
+.home-menu-item:focus-visible .home-menu-word {
+  text-decoration: underline;
+  text-decoration-color: var(--cyan);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 0.09em;
+}
+
+/* ---------- The Moon ---------- */
+
+.moon-stage {
+  display: contents;      /* the globe and the date strip take their own places in the page grid */
+}
+
+.moon-globe {
+  grid-area: moon;
+  position: relative;
+  z-index: 1;
+  justify-self: center;
+  width: min(100%, 440px);
+  aspect-ratio: 1;
+}
+
+.moon-globe.is-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dim);
+  font: 11px/1.3 var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.moon-globe-canvas {
+  position: absolute;
+  inset: 0;
+  outline: none;
+  touch-action: pan-y;      /* a sideways drag turns the Moon; an up or down swipe still scrolls the page */
+}
+
+.moon-globe-canvas:focus-visible {
+  border-radius: 50%;
+  outline: 1px dashed rgba(102, 217, 255, 0.7);
+  outline-offset: -8px;
+}
+
+.moon-globe-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The Moon fades in once its surface has been painted. */
+.moon-globe-canvas,
+.moon-labels,
+.moon-drag-hint {
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+
+.moon-globe.is-ready .moon-globe-canvas,
+.moon-globe.is-ready .moon-labels,
+.moon-globe.is-ready .moon-drag-hint {
+  opacity: 1;
+}
+
+.moon-globe-missing {
+  display: none;
+  position: absolute;
+  inset: 40% 12% auto;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.moon-globe.is-unavailable .moon-globe-missing {
+  display: block;
+}
+
+.moon-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.moon-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;      /* shown once the globe has placed it */
+  padding: 5px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 2px;
+  background: rgba(5, 6, 10, 0.86);
+  color: var(--text);
+  font: 700 11px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.moon-label.is-site {
+  border-color: rgba(76, 201, 240, 0.6);
+  color: var(--cyan);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.moon-label.is-site:hover,
+.moon-label.is-site:focus-visible {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  color: #04121a;
+}
+
+.moon-label.is-sun {
+  border-color: rgba(251, 191, 36, 0.55);
+  color: var(--sun);
+}
+
+.moon-sun-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  width: 11px;
+  height: 11px;
+  border: 2px solid #1a1206;
+  border-radius: 50%;
+  background: var(--sun);
+}
+
+.moon-drag-hint {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  color: var(--dim);
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+/* ---------- Date strip ---------- */
+
+.moon-hud {
+  grid-area: hud;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 18px;
+  animation: home-rise 0.8s var(--swift) 0.24s both;
+}
+
+.moon-date-play {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--cyan);
+  border-radius: 50%;
+  background: rgba(76, 201, 240, 0.08);
+  color: var(--cyan);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.moon-date-play:hover {
+  background: var(--cyan);
+  color: #04121a;
+}
+
+.moon-date-play svg {
+  width: 16px;
+  height: 16px;
+}
+
+.moon-date-track {
+  display: grid;
+  flex: 1 1 220px;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 5px;
+  min-width: 0;
+  max-width: 420px;
+}
+
+.moon-date-track strong {
+  color: var(--bright);
+  font: 700 14px/1.3 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.moon-date-track input {
+  display: block;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.moon-date-track input::-webkit-slider-runnable-track {
+  height: 2px;
+  background: linear-gradient(to right, var(--cyan) var(--fill, 0%), rgba(148, 163, 184, 0.38) var(--fill, 0%));
+}
+
+.moon-date-track input::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  border: 2px solid var(--cyan);
+  border-radius: 50%;
+  background: var(--ink);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.moon-date-track input::-moz-range-track {
+  height: 2px;
+  background: rgba(148, 163, 184, 0.38);
+}
+
+.moon-date-track input::-moz-range-progress {
+  height: 2px;
+  background: var(--cyan);
+}
+
+.moon-date-track input::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--cyan);
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.moon-date-ends {
+  display: flex;
+  justify-content: space-between;
+  color: var(--dim);
+  font: 10px/1.3 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.moon-readouts {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 28px;
+  margin: 0;
+  padding: 0;
+  font: 11px/1.4 var(--mono);
+}
+
+.moon-readouts div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.moon-readouts dt {
+  margin: 0;
+  color: var(--dim);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.moon-readouts dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.moon-readouts dd.is-sun {
+  color: var(--sun);
+}
+
+/* ---------- Footer ---------- */
+
+.home-footer {
+  grid-area: footer;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 26px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--dim);
+  font: 11px/1.5 var(--mono);
+  letter-spacing: 0.04em;
+  animation-delay: 0.3s;
+}
+
+.home-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+.home-footer a svg {
+  width: 13px;
+  height: 13px;
+}
+
+.home-footer a:hover {
+  color: #66d9ff;
+  text-decoration: underline;
+}
+
+/* ---------- Wide windows: the title screen ---------- */
+
+@media (min-width: 901px) {
+  .home-shell {
+    grid-template-areas:
+      'top'
+      '.'
+      'lede'
+      'menu'
+      '.'
+      'hud'
+      'footer';
+    grid-template-rows: auto minmax(14px, 1fr) auto auto minmax(14px, 1.3fr) auto auto;
+    row-gap: 0;
+    padding: 28px 46px 14px;
+  }
+
+  .home-lede {
+    margin-bottom: 26px;
+    font-size: 19px;
+  }
+
+  .home-menu {
+    --word: clamp(64px, min(13.4vh, 8.2vw), 132px);
+
+    justify-self: start;
+  }
+
+  .home-menu-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 0 0 10px;
+    border: 0;
+  }
+
+  .home-menu-index {
+    flex: 0 0 46px;
+  }
+
+  .home-menu-item:last-child {
+    border: 0;
+  }
+
+  .home-menu-arrow {
+    width: calc(var(--word) * 0.4);
+    height: calc(var(--word) * 0.4);
+    margin-left: calc(var(--word) * 0.14);
+  }
+
+  .home-menu-hint {
+    flex: 0 0 100%;
+    max-width: min(30em, 40vw);
+    margin-top: 2px;
+    padding-left: 46px;
+    font-size: 15px;
+  }
+
+  /* The Moon is larger than the window and runs off its right-hand side. */
+  .moon-globe {
+    --moon: min(112vh, 60vw);
+
+    position: absolute;
+    top: calc(50% - var(--moon) * 0.535);
+    right: calc(var(--moon) * -0.12);
+    width: var(--moon);
+  }
+
+  .moon-drag-hint {
+    top: 50%;
+    bottom: auto;
+    left: -6px;
+    transform: translateY(-50%) rotate(180deg);
+    writing-mode: vertical-rl;
+  }
+
+  .moon-hud {
+    justify-content: flex-start;
+    gap: 10px 22px;
+    padding: 14px 0 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  /* Darkens the foot of the Moon so the instruments read clearly over it. */
+  .moon-hud::before {
+    content: '';
+    position: absolute;
+    inset: -56px -60px -80px;
+    z-index: -1;
+    background: linear-gradient(to bottom, transparent, rgba(5, 6, 10, 0.88) 56px, var(--ink) 120px);
+    pointer-events: none;
+  }
+
+  .moon-date-track {
+    flex: 0 0 auto;
+    grid-template-columns: auto clamp(180px, 24vw, 340px);
+    column-gap: 22px;
+    align-items: center;
+    max-width: none;
+  }
+
+  .moon-date-track strong {
+    grid-row: 1 / span 2;
+    min-width: 15.5em;
+  }
+
+  .moon-readouts {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    white-space: nowrap;
+  }
+
+  .home-footer {
+    padding-top: 10px;
+  }
+
+  .home-footer a {
+    margin-left: auto;
+  }
+}
+
+/* Wide windows with a mouse: one entry is chosen at a time, as on a game's title screen.
+   The others wait in outline, and one line under the menu says what the chosen entry does. */
+@media (min-width: 901px) and (hover: hover) {
+  .home-menu {
+    position: relative;
+    padding-bottom: 68px;
+  }
+
+  .home-menu-item {
+    padding-bottom: 0;
+  }
+
+  .home-menu-index {
+    color: var(--dim);
+    transition: color 0.25s ease;
+  }
+
+  /* Outline lettering: the stroke is painted first and the fill, in the page colour, covers its inner half. */
+  .home-menu-word {
+    color: var(--ink);
+    paint-order: stroke fill;
+    -webkit-text-stroke: 2.4px var(--dim);
+    transition: color 0.25s ease, -webkit-text-stroke-color 0.25s ease, transform 0.4s var(--swift);
+  }
+
+  .home-menu-arrow {
+    opacity: 0;
+    transform: translateX(-14px);
+    transition: opacity 0.25s ease, transform 0.4s var(--swift);
+  }
+
+  .home-menu-hint {
+    position: absolute;
+    top: calc(100% - 54px);
+    left: 46px;
+    flex: none;
+    width: max-content;      /* one line where it fits, two on narrower windows */
+    max-width: min(36em, 46vw);
+    margin: 0;
+    padding-left: 32px;
+    opacity: 0;
+    font-size: 17px;
+    transform: translateY(6px);
+    transition: opacity 0.25s ease, transform 0.35s var(--swift);
+    pointer-events: none;
+  }
+
+  .home-menu-hint::before {
+    content: '';
+    position: absolute;
+    top: 0.72em;
+    left: 0;
+    width: 20px;
+    height: 1px;
+    background: var(--cyan);
+  }
+
+  .home-menu-item.is-chosen .home-menu-index {
+    color: var(--cyan);
+  }
+
+  .home-menu-item.is-chosen .home-menu-word {
+    color: var(--bright);
+    -webkit-text-stroke-color: var(--bright);
+    transform: translateX(10px);
+  }
+
+  .home-menu-item.is-chosen .home-menu-arrow {
+    opacity: 1;
+    transform: translateX(10px);
+  }
+
+  .home-menu-item.is-chosen .home-menu-hint {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .home-top span {
+    display: none;
+  }
+
+  .home-lede {
+    font-size: 16px;
+  }
+
+  .moon-label {
+    padding: 4px 5px;
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-top,
+  .home-lede,
+  .home-menu,
+  .home-footer,
+  .moon-hud {
+    animation: none;
+  }
+
+  .home-page * {
+    transition-duration: 0.01s !important;
+  }
+}
