@@ -1,0 +1,3679 @@
+{
+  "components": {
+    "schemas": {
+      "BestOverlap": {
+        "properties": {
+          "duration_h": {
+            "title": "Duration H",
+            "type": "number"
+          },
+          "duration_h_optimistic": {
+            "title": "Duration H Optimistic",
+            "type": "number"
+          },
+          "duration_h_pessimistic": {
+            "title": "Duration H Pessimistic",
+            "type": "number"
+          },
+          "end_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Utc"
+          },
+          "horizon_model": {
+            "title": "Horizon Model",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "start_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Utc"
+          }
+        },
+        "required": [
+          "duration_h",
+          "duration_h_optimistic",
+          "duration_h_pessimistic",
+          "horizon_model",
+          "note"
+        ],
+        "title": "BestOverlap",
+        "type": "object"
+      },
+      "BodySummary": {
+        "properties": {
+          "longest_gap_h": {
+            "description": "Longest stretch with the body not visible; for the Sun, the longest darkness",
+            "title": "Longest Gap H",
+            "type": "number"
+          },
+          "longest_window_end_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longest Window End Utc"
+          },
+          "longest_window_h": {
+            "title": "Longest Window H",
+            "type": "number"
+          },
+          "longest_window_start_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longest Window Start Utc"
+          },
+          "n_windows": {
+            "title": "N Windows",
+            "type": "integer"
+          },
+          "visible_fraction": {
+            "title": "Visible Fraction",
+            "type": "number"
+          },
+          "visible_hours": {
+            "title": "Visible Hours",
+            "type": "number"
+          }
+        },
+        "required": [
+          "visible_hours",
+          "visible_fraction",
+          "n_windows",
+          "longest_window_h",
+          "longest_gap_h"
+        ],
+        "title": "BodySummary",
+        "type": "object"
+      },
+      "CompareCost": {
+        "properties": {
+          "cost_run_id": {
+            "title": "Cost Run Id",
+            "type": "integer"
+          },
+          "horizon_lookup": {
+            "title": "Horizon Lookup",
+            "type": "string"
+          },
+          "horizon_model": {
+            "title": "Horizon Model",
+            "type": "string"
+          },
+          "landing_time_utc": {
+            "title": "Landing Time Utc",
+            "type": "string"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Percentiles"
+            },
+            "title": "Metrics",
+            "type": "object"
+          },
+          "mission_days": {
+            "title": "Mission Days",
+            "type": "number"
+          },
+          "p_survive_full_mission": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Survive Full Mission"
+          },
+          "p_zero_usable_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Zero Usable Hours"
+          }
+        },
+        "required": [
+          "cost_run_id",
+          "horizon_model",
+          "horizon_lookup",
+          "landing_time_utc",
+          "mission_days",
+          "metrics"
+        ],
+        "title": "CompareCost",
+        "type": "object"
+      },
+      "CompareResponse": {
+        "properties": {
+          "cost_caveat": {
+            "title": "Cost Caveat",
+            "type": "string"
+          },
+          "horizon_model": {
+            "title": "Horizon Model",
+            "type": "string"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "scenario": {
+            "title": "Scenario",
+            "type": "string"
+          },
+          "sites": {
+            "items": {
+              "$ref": "#/components/schemas/CompareSite"
+            },
+            "title": "Sites",
+            "type": "array"
+          },
+          "usable_hour_definition": {
+            "title": "Usable Hour Definition",
+            "type": "string"
+          }
+        },
+        "required": [
+          "horizon_model",
+          "scenario",
+          "sites",
+          "cost_caveat",
+          "usable_hour_definition",
+          "meta"
+        ],
+        "title": "CompareResponse",
+        "type": "object"
+      },
+      "CompareSite": {
+        "properties": {
+          "best_overlap": {
+            "$ref": "#/components/schemas/BestOverlap"
+          },
+          "bodies": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BodySummary"
+            },
+            "title": "Bodies",
+            "type": "object"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompareCost"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cost_unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Unavailable Reason"
+          },
+          "latitude_deg": {
+            "title": "Latitude Deg",
+            "type": "number"
+          },
+          "longitude_deg_east": {
+            "title": "Longitude Deg East",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "period": {
+            "$ref": "#/components/schemas/Period"
+          },
+          "site_id": {
+            "title": "Site Id",
+            "type": "string"
+          },
+          "windows": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/WindowItem"
+              },
+              "type": "array"
+            },
+            "title": "Windows",
+            "type": "object"
+          }
+        },
+        "required": [
+          "site_id",
+          "name",
+          "latitude_deg",
+          "longitude_deg_east",
+          "period",
+          "bodies",
+          "best_overlap",
+          "windows"
+        ],
+        "title": "CompareSite",
+        "type": "object"
+      },
+      "CostAnchor": {
+        "properties": {
+          "anchor": {
+            "title": "Anchor",
+            "type": "string"
+          },
+          "award_musd": {
+            "title": "Award Musd",
+            "type": "number"
+          },
+          "award_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Award Year"
+          },
+          "evidence_status": {
+            "title": "Evidence Status",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "verified_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified By"
+          },
+          "verified_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified On"
+          }
+        },
+        "required": [
+          "anchor",
+          "award_musd",
+          "evidence_status"
+        ],
+        "title": "CostAnchor",
+        "type": "object"
+      },
+      "CostAssumption": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "distribution": {
+            "title": "Distribution",
+            "type": "string"
+          },
+          "evidence_status": {
+            "title": "Evidence Status",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "param_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param Max"
+          },
+          "param_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param Mean"
+          },
+          "param_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param Min"
+          },
+          "param_mode": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param Mode"
+          },
+          "param_sd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Param Sd"
+          },
+          "source_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Note"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "name",
+          "distribution",
+          "evidence_status"
+        ],
+        "title": "CostAssumption",
+        "type": "object"
+      },
+      "CostModelInfo": {
+        "properties": {
+          "n_finite_trials": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Finite Trials"
+          },
+          "n_trials": {
+            "title": "N Trials",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "rng_seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rng Seed"
+          },
+          "script_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Script Sha256"
+          },
+          "source_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source File"
+          }
+        },
+        "required": [
+          "name",
+          "n_trials"
+        ],
+        "title": "CostModelInfo",
+        "type": "object"
+      },
+      "CostResponse": {
+        "properties": {
+          "anchors": {
+            "items": {
+              "$ref": "#/components/schemas/CostAnchor"
+            },
+            "title": "Anchors",
+            "type": "array"
+          },
+          "assumptions": {
+            "items": {
+              "$ref": "#/components/schemas/CostAssumption"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "available_runs": {
+            "items": {
+              "$ref": "#/components/schemas/CostRunRef"
+            },
+            "title": "Available Runs",
+            "type": "array"
+          },
+          "caveats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Caveats",
+            "type": "array"
+          },
+          "cost_run_id": {
+            "title": "Cost Run Id",
+            "type": "integer"
+          },
+          "histogram": {
+            "$ref": "#/components/schemas/Histogram"
+          },
+          "horizon_lookup": {
+            "title": "Horizon Lookup",
+            "type": "string"
+          },
+          "horizon_model": {
+            "title": "Horizon Model",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "landing_time_utc": {
+            "title": "Landing Time Utc",
+            "type": "string"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Percentiles"
+            },
+            "title": "Metrics",
+            "type": "object"
+          },
+          "mission_days": {
+            "title": "Mission Days",
+            "type": "number"
+          },
+          "model": {
+            "$ref": "#/components/schemas/CostModelInfo"
+          },
+          "p_survive_full_mission": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Survive Full Mission"
+          },
+          "p_zero_usable_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P Zero Usable Hours"
+          },
+          "site_id": {
+            "title": "Site Id",
+            "type": "string"
+          },
+          "usable_hour_definition": {
+            "title": "Usable Hour Definition",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cost_run_id",
+          "site_id",
+          "horizon_model",
+          "horizon_lookup",
+          "is_default",
+          "model",
+          "landing_time_utc",
+          "mission_days",
+          "metrics",
+          "histogram",
+          "assumptions",
+          "anchors",
+          "usable_hour_definition",
+          "caveats",
+          "available_runs",
+          "meta"
+        ],
+        "title": "CostResponse",
+        "type": "object"
+      },
+      "CostRunRef": {
+        "properties": {
+          "horizon_lookup": {
+            "title": "Horizon Lookup",
+            "type": "string"
+          },
+          "horizon_model": {
+            "title": "Horizon Model",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "horizon_model",
+          "horizon_lookup",
+          "is_default"
+        ],
+        "title": "CostRunRef",
+        "type": "object"
+      },
+      "Coverage": {
+        "properties": {
+          "end_utc": {
+            "title": "End Utc",
+            "type": "string"
+          },
+          "n_samples": {
+            "title": "N Samples",
+            "type": "integer"
+          },
+          "start_utc": {
+            "title": "Start Utc",
+            "type": "string"
+          },
+          "step_seconds": {
+            "title": "Step Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start_utc",
+          "end_utc",
+          "step_seconds",
+          "n_samples"
+        ],
+        "title": "Coverage",
+        "type": "object"
+      },
+      "EphemerisResponse": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {},
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "page": {
+            "$ref": "#/components/schemas/Page"
+          },
+          "range": {
+            "additionalProperties": true,
+            "title": "Range",
+            "type": "object"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "site_id": {
+            "title": "Site Id",
+            "type": "string"
+          },
+          "step_hours": {
+            "title": "Step Hours",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "site_id",
+          "body",
+          "step_hours",
+          "range",
+          "page",
+          "meta"
+        ],
+        "title": "EphemerisResponse",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "properties": {
+          "api_version": {
+            "title": "Api Version",
+            "type": "string"
+          },
+          "database": {
+            "title": "Database",
+            "type": "string"
+          },
+          "dataset_build_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Build Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "database",
+          "api_version"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "Histogram": {
+        "properties": {
+          "bins": {
+            "items": {
+              "$ref": "#/components/schemas/HistogramBin"
+            },
+            "title": "Bins",
+            "type": "array"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "metric",
+          "unit",
+          "bins",
+          "note"
+        ],
+        "title": "Histogram",
+        "type": "object"
+      },
+      "HistogramBin": {
+        "properties": {
+          "bin_hi": {
+            "title": "Bin Hi",
+            "type": "number"
+          },
+          "bin_lo": {
+            "title": "Bin Lo",
+            "type": "number"
+          },
+          "trial_count": {
+            "title": "Trial Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bin_lo",
+          "bin_hi",
+          "trial_count"
+        ],
+        "title": "HistogramBin",
+        "type": "object"
+      },
+      "HorizonProfile": {
+        "properties": {
+          "azimuth_convention": {
+            "title": "Azimuth Convention",
+            "type": "string"
+          },
+          "ground_height_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ground Height M"
+          },
+          "mask_source_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mask Source File"
+          },
+          "mast_m": {
+            "title": "Mast M",
+            "type": "number"
+          },
+          "n_bins": {
+            "title": "N Bins",
+            "type": "integer"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "sigma_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sigma Deg"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mast_m",
+          "azimuth_convention",
+          "n_bins",
+          "source_id"
+        ],
+        "title": "HorizonProfile",
+        "type": "object"
+      },
+      "HorizonResponse": {
+        "properties": {
+          "bins": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "format=rows: one object per azimuth degree",
+            "title": "Bins"
+          },
+          "columns": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {},
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "format=columns: one list per field",
+            "title": "Columns"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/HorizonProfile"
+          },
+          "site_id": {
+            "title": "Site Id",
+            "type": "string"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/SkylineStats"
+          }
+        },
+        "required": [
+          "site_id",
+          "profile",
+          "stats",
+          "meta"
+        ],
+        "title": "HorizonResponse",
+        "type": "object"
+      },
+      "Meta": {
+        "properties": {
+          "built_at_utc": {
+            "title": "Built At Utc",
+            "type": "string"
+          },
+          "caveat": {
+            "title": "Caveat",
+            "type": "string"
+          },
+          "conventions": {
+            "additionalProperties": true,
+            "title": "Conventions",
+            "type": "object"
+          },
+          "dataset_build_id": {
+            "title": "Dataset Build Id",
+            "type": "string"
+          },
+          "horizon_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Horizon used for every value in this response, when one applies",
+            "title": "Horizon Model"
+          },
+          "mask_interpolation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mask Interpolation"
+          },
+          "quality_flags": {
+            "items": {
+              "$ref": "#/components/schemas/QualityFlag"
+            },
+            "title": "Quality Flags",
+            "type": "array"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRef"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "time_scale": {
+            "default": "UTC",
+            "title": "Time Scale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dataset_build_id",
+          "schema_version",
+          "built_at_utc",
+          "conventions",
+          "sources",
+          "quality_flags",
+          "caveat"
+        ],
+        "title": "Meta",
+        "type": "object"
+      },
+      "MetaResponse": {
+        "properties": {
+          "api_version": {
+            "title": "Api Version",
+            "type": "string"
+          },
+          "build_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build Notes"
+          },
+          "coverage": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Coverage"
+            },
+            "title": "Coverage",
+            "type": "object"
+          },
+          "horizon_models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Horizon Models",
+            "type": "array"
+          },
+          "input_files": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Input file name -> SHA-256",
+            "title": "Input Files",
+            "type": "object"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "row_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Row Counts",
+            "type": "object"
+          },
+          "scenarios": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "sigma_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sigma Deg"
+          },
+          "sites": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sites",
+            "type": "array"
+          }
+        },
+        "required": [
+          "api_version",
+          "sites",
+          "coverage",
+          "horizon_models",
+          "scenarios",
+          "row_counts",
+          "input_files",
+          "meta"
+        ],
+        "title": "MetaResponse",
+        "type": "object"
+      },
+      "Page": {
+        "properties": {
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as 'offset' to get the next page; null on the last page",
+            "title": "Next Offset"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "returned": {
+            "title": "Returned",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "returned",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page",
+        "type": "object"
+      },
+      "Percentiles": {
+        "properties": {
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "p10": {
+            "title": "P10",
+            "type": "number"
+          },
+          "p50": {
+            "title": "P50",
+            "type": "number"
+          },
+          "p90": {
+            "title": "P90",
+            "type": "number"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit",
+          "p10",
+          "p50",
+          "p90"
+        ],
+        "title": "Percentiles",
+        "type": "object"
+      },
+      "Period": {
+        "properties": {
+          "end_utc": {
+            "title": "End Utc",
+            "type": "string"
+          },
+          "hours": {
+            "title": "Hours",
+            "type": "number"
+          },
+          "lunar_day_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lunar Day Index"
+          },
+          "start_utc": {
+            "title": "Start Utc",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_utc",
+          "end_utc",
+          "hours"
+        ],
+        "title": "Period",
+        "type": "object"
+      },
+      "PositionResponse": {
+        "properties": {
+          "at_utc": {
+            "title": "At Utc",
+            "type": "string"
+          },
+          "azimuth_deg": {
+            "title": "Azimuth Deg",
+            "type": "number"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "clearance_deg": {
+            "title": "Clearance Deg",
+            "type": "number"
+          },
+          "elevation_deg": {
+            "title": "Elevation Deg",
+            "type": "number"
+          },
+          "interpolated": {
+            "title": "Interpolated",
+            "type": "boolean"
+          },
+          "is_visible": {
+            "title": "Is Visible",
+            "type": "boolean"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "sample_after_utc": {
+            "title": "Sample After Utc",
+            "type": "string"
+          },
+          "sample_before_utc": {
+            "title": "Sample Before Utc",
+            "type": "string"
+          },
+          "scenarios": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ScenarioPosition"
+            },
+            "title": "Scenarios",
+            "type": "object"
+          },
+          "sigma_deg": {
+            "title": "Sigma Deg",
+            "type": "number"
+          },
+          "site_id": {
+            "title": "Site Id",
+            "type": "string"
+          },
+          "skyline_elevation_deg": {
+            "title": "Skyline Elevation Deg",
+            "type": "number"
+          }
+        },
+        "required": [
+          "site_id",
+          "body",
+          "at_utc",
+          "azimuth_deg",
+          "elevation_deg",
+          "skyline_elevation_deg",
+          "clearance_deg",
+          "is_visible",
+          "interpolated",
+          "sample_before_utc",
+          "sample_after_utc",
+          "sigma_deg",
+          "scenarios",
+          "meta"
+        ],
+        "title": "PositionResponse",
+        "type": "object"
+      },
+      "QualityFlag": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "fix_order": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fix Order"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "scope": {
+            "description": "'dataset', 'site:<id>' or 'cost_run:<id>'",
+            "title": "Scope",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "blocker"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "scope",
+          "message"
+        ],
+        "title": "QualityFlag",
+        "type": "object"
+      },
+      "RangeInfo": {
+        "properties": {
+          "clipped_to_coverage": {
+            "default": false,
+            "title": "Clipped To Coverage",
+            "type": "boolean"
+          },
+          "end_utc": {
+            "title": "End Utc",
+            "type": "string"
+          },
+          "start_utc": {
+            "title": "Start Utc",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_utc",
+          "end_utc"
+        ],
+        "title": "RangeInfo",
+        "type": "object"
+      },
+      "ScenarioPosition": {
+        "properties": {
+          "clearance_deg": {
+            "title": "Clearance Deg",
+            "type": "number"
+          },
+          "is_visible": {
+            "title": "Is Visible",
+            "type": "boolean"
+          },
+          "skyline_elevation_deg": {
+            "title": "Skyline Elevation Deg",
+            "type": "number"
+          }
+        },
+        "required": [
+          "skyline_elevation_deg",
+          "clearance_deg",
+          "is_visible"
+        ],
+        "title": "ScenarioPosition",
+        "type": "object"
+      },
+      "SiteDetail": {
+        "properties": {
+          "coordinate_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinate Source"
+          },
+          "coordinate_status": {
+            "title": "Coordinate Status",
+            "type": "string"
+          },
+          "cost_runs": {
+            "items": {
+              "$ref": "#/components/schemas/CostRunRef"
+            },
+            "title": "Cost Runs",
+            "type": "array"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "ground_height_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ground Height M"
+          },
+          "horizon_models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Horizon Models",
+            "type": "array"
+          },
+          "latitude_deg": {
+            "title": "Latitude Deg",
+            "type": "number"
+          },
+          "longitude_deg_east": {
+            "title": "Longitude Deg East",
+            "type": "number"
+          },
+          "mission_context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mission Context"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "observer_alt_km_used": {
+            "title": "Observer Alt Km Used",
+            "type": "number"
+          },
+          "observer_mast_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observer Mast M"
+          },
+          "region_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Note"
+          },
+          "site_id": {
+            "title": "Site Id",
+            "type": "string"
+          },
+          "skyline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SkylineStats"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "terrain_tile_levels": {
+            "title": "Terrain Tile Levels",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "site_id",
+          "name",
+          "latitude_deg",
+          "longitude_deg_east",
+          "coordinate_status",
+          "coverage",
+          "observer_alt_km_used",
+          "horizon_models",
+          "cost_runs",
+          "terrain_tile_levels"
+        ],
+        "title": "SiteDetail",
+        "type": "object"
+      },
+      "SiteResponse": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "site": {
+            "$ref": "#/components/schemas/SiteDetail"
+          }
+        },
+        "required": [
+          "site",
+          "meta"
+        ],
+        "title": "SiteResponse",
+        "type": "object"
+      },
+      "SitesResponse": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "sites": {
+            "items": {
+              "$ref": "#/components/schemas/SiteDetail"
+            },
+            "title": "Sites",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sites",
+          "meta"
+        ],
+        "title": "SitesResponse",
+        "type": "object"
+      },
+      "SkylineStats": {
+        "properties": {
+          "azimuth_of_max_deg": {
+            "title": "Azimuth Of Max Deg",
+            "type": "integer"
+          },
+          "blocker_distance_at_max_km": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocker Distance At Max Km"
+          },
+          "max_deg": {
+            "title": "Max Deg",
+            "type": "number"
+          },
+          "mean_deg": {
+            "title": "Mean Deg",
+            "type": "number"
+          },
+          "min_deg": {
+            "title": "Min Deg",
+            "type": "number"
+          },
+          "sigma_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sigma Deg"
+          }
+        },
+        "required": [
+          "min_deg",
+          "max_deg",
+          "mean_deg",
+          "azimuth_of_max_deg"
+        ],
+        "title": "SkylineStats",
+        "type": "object"
+      },
+      "Source": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "license_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Note"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "retrieved_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved Utc"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "source_id",
+          "name"
+        ],
+        "title": "Source",
+        "type": "object"
+      },
+      "SourceRef": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "source_id",
+          "name"
+        ],
+        "title": "SourceRef",
+        "type": "object"
+      },
+      "SourcesResponse": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/Source"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources",
+          "meta"
+        ],
+        "title": "SourcesResponse",
+        "type": "object"
+      },
+      "SummaryResponse": {
+        "properties": {
+          "best_overlap": {
+            "$ref": "#/components/schemas/BestOverlap"
+          },
+          "bodies": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BodySummary"
+            },
+            "title": "Bodies",
+            "type": "object"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "period": {
+            "$ref": "#/components/schemas/Period"
+          },
+          "scenario": {
+            "title": "Scenario",
+            "type": "string"
+          },
+          "site_id": {
+            "title": "Site Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "site_id",
+          "period",
+          "scenario",
+          "bodies",
+          "best_overlap",
+          "meta"
+        ],
+        "title": "SummaryResponse",
+        "type": "object"
+      },
+      "TerrainTileResponse": {
+        "properties": {
+          "half_width_m": {
+            "title": "Half Width M",
+            "type": "number"
+          },
+          "heights_m": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Heights M",
+            "type": "array"
+          },
+          "layout_note": {
+            "title": "Layout Note",
+            "type": "string"
+          },
+          "level_index": {
+            "title": "Level Index",
+            "type": "integer"
+          },
+          "levels_available": {
+            "items": {
+              "$ref": "#/components/schemas/TileLevel"
+            },
+            "title": "Levels Available",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "n_cells": {
+            "description": "Points per side in this response, after applying stride",
+            "title": "N Cells",
+            "type": "integer"
+          },
+          "n_cells_stored": {
+            "title": "N Cells Stored",
+            "type": "integer"
+          },
+          "site_id": {
+            "title": "Site Id",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "spacing_m": {
+            "title": "Spacing M",
+            "type": "number"
+          },
+          "stride": {
+            "title": "Stride",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "site_id",
+          "level_index",
+          "half_width_m",
+          "n_cells_stored",
+          "stride",
+          "n_cells",
+          "spacing_m",
+          "source_id",
+          "layout_note",
+          "levels_available",
+          "heights_m",
+          "meta"
+        ],
+        "title": "TerrainTileResponse",
+        "type": "object"
+      },
+      "TileLevel": {
+        "properties": {
+          "half_width_m": {
+            "title": "Half Width M",
+            "type": "number"
+          },
+          "level_index": {
+            "title": "Level Index",
+            "type": "integer"
+          },
+          "n_cells": {
+            "title": "N Cells",
+            "type": "integer"
+          },
+          "scale_m": {
+            "title": "Scale M",
+            "type": "number"
+          },
+          "spacing_m": {
+            "title": "Spacing M",
+            "type": "number"
+          }
+        },
+        "required": [
+          "level_index",
+          "half_width_m",
+          "n_cells",
+          "spacing_m",
+          "scale_m"
+        ],
+        "title": "TileLevel",
+        "type": "object"
+      },
+      "TransitionResponse": {
+        "properties": {
+          "after_utc": {
+            "title": "After Utc",
+            "type": "string"
+          },
+          "azimuth_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Azimuth Deg"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "currently_visible": {
+            "title": "Currently Visible",
+            "type": "boolean"
+          },
+          "event": {
+            "anyOf": [
+              {
+                "enum": [
+                  "rise",
+                  "set"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event"
+          },
+          "hours_until": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hours Until"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "scenario": {
+            "title": "Scenario",
+            "type": "string"
+          },
+          "site_id": {
+            "title": "Site Id",
+            "type": "string"
+          },
+          "time_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Utc"
+          }
+        },
+        "required": [
+          "site_id",
+          "body",
+          "after_utc",
+          "scenario",
+          "currently_visible",
+          "meta"
+        ],
+        "title": "TransitionResponse",
+        "type": "object"
+      },
+      "WindowItem": {
+        "properties": {
+          "duration_h": {
+            "title": "Duration H",
+            "type": "number"
+          },
+          "end_azimuth_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Azimuth Deg"
+          },
+          "end_utc": {
+            "title": "End Utc",
+            "type": "string"
+          },
+          "ends_after_data": {
+            "title": "Ends After Data",
+            "type": "boolean"
+          },
+          "overlap_duration_h": {
+            "title": "Overlap Duration H",
+            "type": "number"
+          },
+          "overlap_end_utc": {
+            "title": "Overlap End Utc",
+            "type": "string"
+          },
+          "overlap_start_utc": {
+            "description": "Start of the part of this window inside the requested range",
+            "title": "Overlap Start Utc",
+            "type": "string"
+          },
+          "peak_elevation_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peak Elevation Deg"
+          },
+          "start_azimuth_deg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Azimuth Deg"
+          },
+          "start_utc": {
+            "title": "Start Utc",
+            "type": "string"
+          },
+          "starts_before_data": {
+            "title": "Starts Before Data",
+            "type": "boolean"
+          },
+          "uncertainty": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WindowUncertainty"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "start_utc",
+          "end_utc",
+          "duration_h",
+          "starts_before_data",
+          "ends_after_data",
+          "overlap_start_utc",
+          "overlap_end_utc",
+          "overlap_duration_h"
+        ],
+        "title": "WindowItem",
+        "type": "object"
+      },
+      "WindowUncertainty": {
+        "properties": {
+          "earliest_end_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest End Utc"
+          },
+          "earliest_start_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earliest Start Utc"
+          },
+          "latest_end_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest End Utc"
+          },
+          "latest_start_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Start Utc"
+          },
+          "max_duration_h": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Duration H"
+          },
+          "min_duration_h": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Duration H"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "WindowUncertainty",
+        "type": "object"
+      },
+      "WindowsResponse": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "range": {
+            "$ref": "#/components/schemas/RangeInfo"
+          },
+          "scenario": {
+            "title": "Scenario",
+            "type": "string"
+          },
+          "sigma_deg": {
+            "title": "Sigma Deg",
+            "type": "number"
+          },
+          "site_id": {
+            "title": "Site Id",
+            "type": "string"
+          },
+          "total_overlap_hours": {
+            "title": "Total Overlap Hours",
+            "type": "number"
+          },
+          "windows": {
+            "items": {
+              "$ref": "#/components/schemas/WindowItem"
+            },
+            "title": "Windows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "site_id",
+          "body",
+          "scenario",
+          "range",
+          "sigma_deg",
+          "windows",
+          "total_overlap_hours",
+          "meta"
+        ],
+        "title": "WindowsResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "\nRead-only data for **Stargazer**, a lunar south pole landing-site explorer (NASA Space Apps 2026).\n\nEverything here is precomputed once by `backend/scripts/build_db.py` from JPL Horizons ephemerides,\nNASA LOLA terrain and the team's cost model, so the website, the Python library and the CLI all\nread the same numbers.\n\n**Read this first**\n\n- Values are **geometric visibility**: is the centre of the Sun or Earth above the terrain skyline?\n  That is not electrical power and not a working radio link.\n- Every response carries a `meta` block: dataset build id, conventions, the horizon model used,\n  sources and quality flags. Check `meta.quality_flags` before quoting a number.\n- `horizon_model` defaults to `lola_mask` (real terrain). `flat` is a 0-degree horizon kept for\n  comparison. The API never substitutes one for the other.\n- Costs are distributions under stated assumptions, not mission-grade estimates.\n- The API never extrapolates outside the data coverage (see `/meta`).\n",
+    "title": "Stargazer API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/compare": {
+      "get": {
+        "operationId": "compare_api_v1_compare_get",
+        "parameters": [
+          {
+            "description": "Comma-separated site ids. Default: every site",
+            "in": "query",
+            "name": "sites",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated site ids. Default: every site",
+              "title": "Sites"
+            }
+          },
+          {
+            "description": "ISO 8601 UTC. Default: start of coverage",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 8601 UTC. Default: start of coverage",
+              "title": "Start"
+            }
+          },
+          {
+            "description": "Length of the period in days. Default: 29.53 (one lunar day)",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Length of the period in days. Default: 29.53 (one lunar day)",
+              "title": "Days"
+            }
+          },
+          {
+            "description": "Precomputed period instead of start/days: 1, 2, ... or 0 for the whole coverage",
+            "in": "query",
+            "name": "lunar_day",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Precomputed period instead of start/days: 1, 2, ... or 0 for the whole coverage",
+              "title": "Lunar Day"
+            }
+          },
+          {
+            "description": "One horizon for the whole payload, cost included",
+            "in": "query",
+            "name": "horizon_model",
+            "required": false,
+            "schema": {
+              "default": "lola_mask",
+              "description": "One horizon for the whole payload, cost included",
+              "enum": [
+                "lola_mask",
+                "flat"
+              ],
+              "title": "Horizon Model",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scenario",
+            "required": false,
+            "schema": {
+              "default": "nominal",
+              "enum": [
+                "nominal",
+                "optimistic",
+                "pessimistic"
+              ],
+              "title": "Scenario",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompareResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "Per-site visibility summaries, windows and cost percentiles for the same period and horizon",
+        "tags": [
+          "compare"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "Is the API up and is the dataset built?",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/meta": {
+      "get": {
+        "operationId": "meta_api_v1_meta_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "Build info, coverage, conventions and every quality flag",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/sites": {
+      "get": {
+        "operationId": "list_sites_api_v1_sites_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "All landing sites",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/sites/{site_id}": {
+      "get": {
+        "operationId": "get_site_api_v1_sites__site_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "One site: coordinates, ground height, skyline stats, coverage",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/sites/{site_id}/cost": {
+      "get": {
+        "operationId": "get_cost_api_v1_sites__site_id__cost_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which horizon the cost run used. Never falls back to another one.",
+            "in": "query",
+            "name": "horizon_model",
+            "required": false,
+            "schema": {
+              "default": "lola_mask",
+              "description": "Which horizon the cost run used. Never falls back to another one.",
+              "enum": [
+                "lola_mask",
+                "flat"
+              ],
+              "title": "Horizon Model",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default: the run that reads the mask like the website (linear_between_bins)",
+            "in": "query",
+            "name": "horizon_lookup",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "linear_between_bins",
+                    "nearest_lower_bin",
+                    "not_applicable"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Default: the run that reads the mask like the website (linear_between_bins)",
+              "title": "Horizon Lookup"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "Cost per usable hour: p10/p50/p90, histogram, assumptions and their evidence status",
+        "tags": [
+          "cost"
+        ]
+      }
+    },
+    "/api/v1/sites/{site_id}/ephemeris": {
+      "get": {
+        "operationId": "get_ephemeris_api_v1_sites__site_id__ephemeris_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "body",
+            "required": false,
+            "schema": {
+              "default": "sun",
+              "enum": [
+                "sun",
+                "earth"
+              ],
+              "title": "Body",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO 8601 UTC. Default: start of coverage",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 8601 UTC. Default: start of coverage",
+              "title": "Start"
+            }
+          },
+          {
+            "description": "ISO 8601 UTC. Default: end of coverage",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 8601 UTC. Default: end of coverage",
+              "title": "End"
+            }
+          },
+          {
+            "description": "Keep every step-th hourly sample (a whole number of hours)",
+            "in": "query",
+            "name": "step",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Keep every step-th hourly sample (a whole number of hours)",
+              "maximum": 720,
+              "minimum": 1,
+              "title": "Step",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "horizon_model",
+            "required": false,
+            "schema": {
+              "default": "lola_mask",
+              "enum": [
+                "lola_mask",
+                "flat"
+              ],
+              "title": "Horizon Model",
+              "type": "string"
+            }
+          },
+          {
+            "description": "columns suits pandas.DataFrame; csv is a download",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "rows",
+              "description": "columns suits pandas.DataFrame; csv is a download",
+              "enum": [
+                "rows",
+                "columns",
+                "csv"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Rows per page (capped by the server, 3000 by default)",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Rows per page (capped by the server, 3000 by default)",
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EphemerisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "Hourly azimuth, elevation, skyline, clearance and visibility for one body",
+        "tags": [
+          "ephemeris"
+        ]
+      }
+    },
+    "/api/v1/sites/{site_id}/horizon": {
+      "get": {
+        "operationId": "get_horizon_api_v1_sites__site_id__horizon_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "rows = list of objects; columns = one list per field",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "rows",
+              "description": "rows = list of objects; columns = one list per field",
+              "enum": [
+                "rows",
+                "columns"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HorizonResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "The 360-bin terrain skyline seen from the site",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/sites/{site_id}/position": {
+      "get": {
+        "operationId": "get_position_api_v1_sites__site_id__position_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO 8601 UTC time inside the data coverage, e.g. 2026-12-15T06:30:00Z",
+            "in": "query",
+            "name": "at",
+            "required": true,
+            "schema": {
+              "description": "ISO 8601 UTC time inside the data coverage, e.g. 2026-12-15T06:30:00Z",
+              "title": "At",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "body",
+            "required": false,
+            "schema": {
+              "default": "sun",
+              "enum": [
+                "sun",
+                "earth"
+              ],
+              "title": "Body",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "horizon_model",
+            "required": false,
+            "schema": {
+              "default": "lola_mask",
+              "enum": [
+                "lola_mask",
+                "flat"
+              ],
+              "title": "Horizon Model",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "Sun or Earth azimuth, elevation, skyline and clearance at one time",
+        "tags": [
+          "ephemeris"
+        ]
+      }
+    },
+    "/api/v1/sites/{site_id}/solar-elevation": {
+      "get": {
+        "operationId": "get_solar_elevation_api_v1_sites__site_id__solar_elevation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO 8601 UTC time inside the data coverage, e.g. 2026-12-15T06:30:00Z",
+            "in": "query",
+            "name": "at",
+            "required": true,
+            "schema": {
+              "description": "ISO 8601 UTC time inside the data coverage, e.g. 2026-12-15T06:30:00Z",
+              "title": "At",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "horizon_model",
+            "required": false,
+            "schema": {
+              "default": "lola_mask",
+              "enum": [
+                "lola_mask",
+                "flat"
+              ],
+              "title": "Horizon Model",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "Sun elevation, azimuth, skyline and clearance at one time",
+        "tags": [
+          "ephemeris"
+        ]
+      }
+    },
+    "/api/v1/sites/{site_id}/terrain-tile": {
+      "get": {
+        "operationId": "get_terrain_tile_api_v1_sites__site_id__terrain_tile_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Tile level, 0 = innermost. Default: the level closest to 10 km x 10 km.",
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tile level, 0 = innermost. Default: the level closest to 10 km x 10 km.",
+              "title": "Level"
+            }
+          },
+          {
+            "description": "Keep every stride-th point per axis. Default: at most 129 points per side.",
+            "in": "query",
+            "name": "stride",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 64,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep every stride-th point per axis. Default: at most 129 points per side.",
+              "title": "Stride"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerrainTileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "Local heightmap around the site (metres relative to the site)",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/sites/{site_id}/visibility/next-transition": {
+      "get": {
+        "operationId": "get_next_transition_api_v1_sites__site_id__visibility_next_transition_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO 8601 UTC time inside the data coverage",
+            "in": "query",
+            "name": "after",
+            "required": true,
+            "schema": {
+              "description": "ISO 8601 UTC time inside the data coverage",
+              "title": "After",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "body",
+            "required": false,
+            "schema": {
+              "default": "sun",
+              "enum": [
+                "sun",
+                "earth",
+                "both"
+              ],
+              "title": "Body",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "horizon_model",
+            "required": false,
+            "schema": {
+              "default": "lola_mask",
+              "enum": [
+                "lola_mask",
+                "flat"
+              ],
+              "title": "Horizon Model",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scenario",
+            "required": false,
+            "schema": {
+              "default": "nominal",
+              "enum": [
+                "nominal",
+                "optimistic",
+                "pessimistic"
+              ],
+              "title": "Scenario",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransitionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "The next rise or set after a time, with its azimuth",
+        "tags": [
+          "visibility"
+        ]
+      }
+    },
+    "/api/v1/sites/{site_id}/visibility/summary": {
+      "get": {
+        "operationId": "get_summary_api_v1_sites__site_id__visibility_summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO 8601 UTC. Default: start of coverage",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 8601 UTC. Default: start of coverage",
+              "title": "Start"
+            }
+          },
+          {
+            "description": "Length of the period in days. Default: 29.53 (one lunar day)",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Length of the period in days. Default: 29.53 (one lunar day)",
+              "title": "Days"
+            }
+          },
+          {
+            "description": "Precomputed period instead of start/days: 1, 2, ... or 0 for the whole coverage",
+            "in": "query",
+            "name": "lunar_day",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Precomputed period instead of start/days: 1, 2, ... or 0 for the whole coverage",
+              "title": "Lunar Day"
+            }
+          },
+          {
+            "in": "query",
+            "name": "horizon_model",
+            "required": false,
+            "schema": {
+              "default": "lola_mask",
+              "enum": [
+                "lola_mask",
+                "flat"
+              ],
+              "title": "Horizon Model",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scenario",
+            "required": false,
+            "schema": {
+              "default": "nominal",
+              "enum": [
+                "nominal",
+                "optimistic",
+                "pessimistic"
+              ],
+              "title": "Scenario",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "Hours, fraction, longest window and longest gap for Sun, Earth and both",
+        "tags": [
+          "visibility"
+        ]
+      }
+    },
+    "/api/v1/sites/{site_id}/visibility/windows": {
+      "get": {
+        "operationId": "get_windows_api_v1_sites__site_id__visibility_windows_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "sun, earth, or both (Sun AND Earth at the same time)",
+            "in": "query",
+            "name": "body",
+            "required": false,
+            "schema": {
+              "default": "both",
+              "description": "sun, earth, or both (Sun AND Earth at the same time)",
+              "enum": [
+                "sun",
+                "earth",
+                "both"
+              ],
+              "title": "Body",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO 8601 UTC. Default: start of coverage",
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 8601 UTC. Default: start of coverage",
+              "title": "Start"
+            }
+          },
+          {
+            "description": "ISO 8601 UTC. Default: end of coverage",
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 8601 UTC. Default: end of coverage",
+              "title": "End"
+            }
+          },
+          {
+            "description": "Shortcut for one calendar month, e.g. 2027-01 (instead of start/end)",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Shortcut for one calendar month, e.g. 2027-01 (instead of start/end)",
+              "title": "Month"
+            }
+          },
+          {
+            "in": "query",
+            "name": "horizon_model",
+            "required": false,
+            "schema": {
+              "default": "lola_mask",
+              "enum": [
+                "lola_mask",
+                "flat"
+              ],
+              "title": "Horizon Model",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Skyline as modelled, lowered by sigma, raised by sigma; 'all' = nominal windows each with an uncertainty block",
+            "in": "query",
+            "name": "scenario",
+            "required": false,
+            "schema": {
+              "default": "nominal",
+              "description": "Skyline as modelled, lowered by sigma, raised by sigma; 'all' = nominal windows each with an uncertainty block",
+              "enum": [
+                "nominal",
+                "optimistic",
+                "pessimistic",
+                "all"
+              ],
+              "title": "Scenario",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WindowsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "When the Sun, the Earth, or both are above the skyline",
+        "tags": [
+          "visibility"
+        ]
+      }
+    },
+    "/api/v1/sources": {
+      "get": {
+        "operationId": "sources_api_v1_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourcesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unknown site, or the requested data is not loaded"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid parameter, or a time outside the data coverage"
+          }
+        },
+        "summary": "Where the data comes from",
+        "tags": [
+          "system"
+        ]
+      }
+    }
+  }
+}

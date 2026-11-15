@@ -18,10 +18,18 @@ import ComparisonPanel from './components/ComparisonPanel';
 import HelpCard from './components/HelpCard';
 import landingSites from './data/landingSites.json';
 
+const LUNAR_DAY_MS = 29.53 * 86400000;
+
 function App() {
   const initialTime = new Date('2026-12-01T00:00:00Z');
   const [time, setTime] = useState(initialTime);
   const [windowStart] = useState(initialTime);
+  // Mission time never leaves the one lunar day shown on the seek bar.
+  const windowEnd = useMemo(() => new Date(windowStart.getTime() + LUNAR_DAY_MS), [windowStart]);
+  const setClampedTime = useCallback((nextTime) => {
+    const clamped = Math.max(windowStart.getTime(), Math.min(windowEnd.getTime(), nextTime.getTime()));
+    setTime(new Date(clamped));
+  }, [windowStart, windowEnd]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeWarp, setTimeWarp] = useState(1); // 1x speed
   const [activeTool, setActiveTool] = useState('view-modes');
@@ -38,6 +46,15 @@ function App() {
   const [cameraSensitivity, setCameraSensitivity] = useState(1.8);
   const [cameraInfo, setCameraInfo] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  // Free View flying. The 3D scene reads this every frame: `forward` / `right` are -1, 0 or 1 while
+  // move keys are held, `boost` is Shift, and `stepForward` / `stepRight` count clicks on the on-screen pad.
+  const freeMoveRef = useRef({ forward: 0, right: 0, boost: false, stepForward: 0, stepRight: 0 });
+  const handleFreeMoveKeys = useCallback((held, boost) => {
+    const moves = freeMoveRef.current;
+    moves.forward = (held.up ? 1 : 0) - (held.down ? 1 : 0);
+    moves.right = (held.right ? 1 : 0) - (held.left ? 1 : 0);
+    moves.boost = boost;
+  }, []);
   const handleLookDrag = useCallback((yawDegrees, pitchDegrees) => {
     setCameraPan((current) => ({
       yaw: current.yaw + yawDegrees,
@@ -79,13 +96,21 @@ function App() {
     };
     const increment = increments[direction];
     if (!increment) return;
+    if (viewMode === 'free') {
+      // In Free View the on-screen pad moves the camera a short hop instead of turning it.
+      // (Held keys are reported separately, through handleFreeMoveKeys.)
+      const steps = { up: [1, 0], down: [-1, 0], left: [0, -1], right: [0, 1] }[direction];
+      freeMoveRef.current.stepForward += steps[0] * amount;
+      freeMoveRef.current.stepRight += steps[1] * amount;
+      return;
+    }
     const sign = invertLook ? -1 : 1;
 
     setCameraPan((current) => ({
       yaw: current.yaw + increment.yaw * sign * amount,
       pitch: Math.max(-35, Math.min(35, current.pitch + increment.pitch * sign * amount))
     }));
-  }, [invertLook]);
+  }, [invertLook, viewMode]);
 
   const resetCameraPan = useCallback(() => setCameraPan({ yaw: 0, pitch: 0 }), []);
   const lookAt = useCallback((body) => {
@@ -99,6 +124,8 @@ function App() {
   }, [selectedSite, time]);
 
   const timeInterval = useRef(null);
+  const timeRef = useRef(time);     // latest time, for the playback timer
+  useEffect(() => { timeRef.current = time; }, [time]);
 
   useEffect(() => () => clearInterval(timeInterval.current), []);
 
@@ -107,35 +134,37 @@ function App() {
     if (!isPlaying) return undefined;
 
     timeInterval.current = setInterval(() => {
-      setTime((current) => {
-        const next = new Date(current.getTime() + timeWarp * 3600000);
-        const windowEnd = new Date(windowStart.getTime() + 29.53 * 86400000);
-        return next > windowEnd ? windowStart : next;
-      });
+      // Playback stops at the end of the lunar day and holds the final positions.
+      const next = Math.min(timeRef.current.getTime() + timeWarp * 3600000, windowEnd.getTime());
+      setTime(new Date(next));
+      if (next >= windowEnd.getTime()) setIsPlaying(false);
     }, 1000);
 
     return () => clearInterval(timeInterval.current);
-  }, [isPlaying, timeWarp, windowStart]);
+  }, [isPlaying, timeWarp, windowEnd]);
 
-  const togglePlay = () => setIsPlaying((playing) => !playing);
-  const handleTimeChange = (nextTime) => setTime(nextTime);
-  const handleStep = (hours) => {
-    const next = new Date(time.getTime() + hours * 3600000);
-    const windowEnd = new Date(windowStart.getTime() + 29.53 * 86400000);
-    setTime(next < windowStart ? windowStart : next > windowEnd ? windowEnd : next);
+  const togglePlay = () => {
+    // Pressing play at the very end starts the lunar day again from the beginning.
+    if (!isPlaying && time.getTime() >= windowEnd.getTime()) setTime(windowStart);
+    setIsPlaying((playing) => !playing);
   };
+  const handleTimeChange = (nextTime) => setClampedTime(nextTime);
+  const handleStep = (hours) => setClampedTime(new Date(time.getTime() + hours * 3600000));
 
+  // Both searches stop at the end of the lunar day; null means no more rises or sets before then.
   const nextSunTransition = findNextHorizonTransition(
     time,
     calculateSunPosition,
     selectedSite.latitude,
-    selectedSite.longitude
+    selectedSite.longitude,
+    windowEnd
   );
   const nextEarthTransition = findNextHorizonTransition(
     time,
     calculateEarthPosition,
     selectedSite.latitude,
-    selectedSite.longitude
+    selectedSite.longitude,
+    windowEnd
   );
   const sunSummary = useMemo(
     () => getVisibilitySummary(windowStart, calculateSunPosition, selectedSite.latitude, selectedSite.longitude),
@@ -158,14 +187,14 @@ function App() {
     [selectedSite]
   );
   const handleJumpTo = (target) => {
-    if (target === 'best' && bestWindow) return setTime(bestWindow.time);
+    if (target === 'best' && bestWindow) return setClampedTime(bestWindow.time);
     const transition = target === 'sun' ? nextSunTransition : nextEarthTransition;
-    if (transition) setTime(transition.time);
+    if (transition) setClampedTime(transition.time);
   };
   const directRadioPossible = telemetry.isSunVisible && telemetry.isEarthVisible;
   const verdict = directRadioPossible
     ? 'Sun and Earth are visible. Array power and direct radio contact are available.'
-    : `Direct radio contact is impossible. Sun is ${telemetry.isSunVisible ? 'visible' : `down and rises in ${Math.round(nextSunTransition?.hours || 0)} hours`}; Earth is ${telemetry.isEarthVisible ? 'visible' : 'below the horizon'}.`;
+    : `Direct radio contact is impossible. Sun is ${telemetry.isSunVisible ? 'visible' : nextSunTransition ? `down and rises in ${Math.round(nextSunTransition.hours)} hours` : 'down for the rest of this lunar day'}; Earth is ${telemetry.isEarthVisible ? 'visible' : 'below the horizon'}.`;
 
   return (
     <div className="app">
@@ -187,6 +216,8 @@ function App() {
         onCameraInfo={setCameraInfo}
         cameraInfo={cameraInfo}
         showInterface={showInterface}
+        freeMoveRef={freeMoveRef}
+        lookSensitivity={cameraSensitivity}
       />
 
       <div className="overlay-container">
@@ -211,6 +242,7 @@ function App() {
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onPan={handleCameraPan}
+          onFreeMoveKeys={handleFreeMoveKeys}
           onResetPan={resetCameraPan}
           invertLook={invertLook}
           onInvertLookChange={setInvertLook}

@@ -1,0 +1,10 @@
+# Stargazer backend. Python 3.11+.
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.6
+# Build step only (scripts/build_db.py --rerun-cost imports cost_mc.py, which needs numpy)
+numpy>=1.26
+# Tests and the README client example
+pytest>=8.0
+httpx>=0.27
+# ephemeris_fetch.py (fetching from JPL Horizons) also needs: requests

@@ -53,6 +53,19 @@ The cost model is separate from the web app. It samples assumptions in `cost_mc.
 ## Regenerate analysis data
 
 Python 3 is required. Install dependencies for the script you plan to run:
+### Data scripts
+
+The Python data scripts live in `backend/`. Run them from the top of the repo:
+
+```bash
+pip install requests numpy
+python backend/ephemeris_fetch.py                        # Sun/Earth positions from JPL Horizons -> ephemeris_long/ and frontend/src/data/ephemeris/
+python backend/cost_mc.py ephemeris_long/malapert.json   # cost model -> ephemeris_long/malapert_cost.json
+```
+
+`ephemeris_fetch.py` overwrites the ephemeris files the frontend reads, so check the visibility hours after re-running it.
+
+### Validation
 
 ```sh
 python -m pip install requests  # ephemeris_fetch.py

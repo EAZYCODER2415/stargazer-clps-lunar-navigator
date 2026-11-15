@@ -8,6 +8,14 @@ const TERMS = [
   ['Array power', 'Electricity from the solar panels. It needs the Sun above the horizon.']
 ];
 
+const FREE_VIEW_CONTROLS = [
+  ['Take control', 'Click the scene or press a move key. The mouse is captured and a + marks the centre.'],
+  ['Look', 'Move the mouse.'],
+  ['Move', 'W / A / S / D or the arrow keys. Forward follows the +, so look up to climb.'],
+  ['Go faster', 'Hold Shift.'],
+  ['Release', 'Press Esc to get the mouse back.']
+];
+
 const HelpCard = ({ onClose }) => (
   <aside className="help-card" aria-label="How to use Stargazer">
     <div className="help-card-header">
@@ -22,6 +30,12 @@ const HelpCard = ({ onClose }) => (
     <dl>
       {TERMS.map(([term, meaning]) => (
         <div key={term}><dt>{term}</dt><dd>{meaning}</dd></div>
+      ))}
+    </dl>
+    <h3>Free View controls</h3>
+    <dl className="help-card-controls">
+      {FREE_VIEW_CONTROLS.map(([action, how]) => (
+        <div key={action}><dt>{action}</dt><dd>{how}</dd></div>
       ))}
     </dl>
     <button type="button" className="help-card-done" onClick={onClose}>Got it</button>
