@@ -430,8 +430,177 @@
   margin-left: 0;
 }
 
+/* Lunar day picker and site ticks */
+.cv-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.cv-control {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cv-control-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  padding: 0;
+  color: #94a3b8;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cv-days,
+.cv-site-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.cv-days button,
+.cv-site-options label {
+  border: 1px solid rgba(71, 85, 105, 0.7);
+  border-radius: 0.28rem;
+  background: rgba(15, 23, 42, 0.78);
+  color: #cbd5e1;
+  cursor: pointer;
+  font: inherit;
+}
+
+.cv-days button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+}
+
+.cv-days button b {
+  color: #f8fafc;
+  font-size: 0.74rem;
+}
+
+.cv-days button span {
+  color: #94a3b8;
+  font-size: 0.66rem;
+}
+
+.cv-site-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.74rem;
+}
+
+.cv-site-options input {
+  accent-color: #f59e0b;
+}
+
+.cv-days button:hover,
+.cv-site-options label:hover {
+  border-color: #f59e0b;
+}
+
+.cv-days button:focus-visible,
+.cv-site-options label:focus-within {
+  outline: 2px solid #fbbf24;
+  outline-offset: 1px;
+}
+
+.cv-days button.is-active,
+.cv-site-options label.is-checked {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  color: #f8fafc;
+}
+
+.cv-days button.is-active span {
+  color: #fde68a;
+}
+
+.cv-site-options label.is-locked {
+  cursor: default;
+}
+
+.cv-note {
+  margin: 0 0 0.75rem;
+  color: #fde68a;
+  font-size: 0.74rem;
+}
+
+/* Takeaways */
+.cv-insights {
+  margin: 0 0 0.75rem;
+}
+
+.cv-insights ul {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.55rem 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.cv-insights li {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: baseline;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.cv-insights li b {
+  color: #34d399;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cv-insights li span {
+  color: #e2e8f0;
+}
+
+.cv-insight-warning {
+  color: #fde68a;
+  font-style: normal;
+}
+
+.cv-insights small {
+  color: #94a3b8;
+  font-size: 0.66rem;
+}
+
+/* With one or two sites ticked the cards share the row instead of leaving a gap. */
+.cv-cards-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cv-cards-1 {
+  grid-template-columns: minmax(0, 48rem);
+}
+
+/* Lunar days the app's timeline does not cover: bars are read-only. */
+.cv-track.is-static,
+.cv-track.is-static:hover {
+  background: rgba(148, 163, 184, 0.12);
+  cursor: default;
+}
+
 @media (max-width: 1100px) {
   .cv-cards {
     grid-template-columns: 1fr;
+  }
+
+  .cv-insights li {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
   }
 }

@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pause, Play, X } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { compareSnapshot, loadCompare } from '../utils/compareData';
+import {
+  LUNAR_DAYS,
+  buildInsights,
+  compareSnapshots,
+  formatCost,
+  formatDate,
+  formatDateTime,
+  formatDay,
+  loadCompare
+} from '../utils/compareData';
 import landingSites from '../data/landingSites.json';
 import '../styles/compareView.css';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const BODIES = [
   { key: 'sun', label: 'Sun' },
   { key: 'earth', label: 'Earth' },
@@ -24,13 +32,6 @@ const UNVERIFIED_WORDING = {
   COORDINATES_UNVERIFIED: 'Site coordinates do not have a citation recorded yet.'
 };
 
-const pad = (value) => String(value).padStart(2, '0');
-const formatDay = (date) => `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
-const formatDateTime = (value) => {
-  const date = new Date(value);
-  return `${formatDay(date)} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())} UTC`;
-};
-const formatCost = (value) => (value == null ? 'n/a' : `$${value.toFixed(2)}M`);
 
 /** Ids of the sites with the best value for one stat. Empty when every site ties or none has a value. */
 function bestSites(sites, read, pick) {
@@ -82,14 +83,22 @@ const CostTooltip = ({ active, payload }) => {
 };
 
 const CompareView = ({ time, windowStart, isPlaying, onTogglePlay, onTimeChange, onClose }) => {
-  const [{ payload, source }, setData] = useState({ payload: compareSnapshot, source: 'loading' });
+  const [lunarDay, setLunarDay] = useState(1);
+  const [loaded, setLoaded] = useState(null);
+  // Sites the user has unticked. Everything else is compared, so a site new to the API shows up ticked.
+  const [hiddenSites, setHiddenSites] = useState(() => new Set());
   const [headerHeight, setHeaderHeight] = useState(52);
 
   useEffect(() => {
     let cancelled = false;
-    loadCompare().then((result) => { if (!cancelled) setData(result); });
+    loadCompare(lunarDay).then((result) => { if (!cancelled) setLoaded(result); });
     return () => { cancelled = true; };
-  }, []);
+  }, [lunarDay]);
+
+  // Until the chosen lunar day has answered (API or saved copy), show its saved copy.
+  const { payload, source } = loaded?.day === lunarDay
+    ? loaded
+    : { payload: compareSnapshots[lunarDay], source: 'loading' };
 
   // The view starts directly under the header, whatever height the header has at this width.
   useEffect(() => {
@@ -109,11 +118,26 @@ const CompareView = ({ time, windowStart, isPlaying, onTogglePlay, onTimeChange,
   }, [onClose]);
 
   // Same order as the site menu in the header; sites the app does not list go last.
-  const sites = useMemo(() => {
+  const allSites = useMemo(() => {
     const order = landingSites.map((site) => site.id);
     const rank = (id) => (order.includes(id) ? order.indexOf(id) : order.length);
     return [...payload.sites].sort((a, b) => rank(a.site_id) - rank(b.site_id));
   }, [payload]);
+
+  // The sites being compared. Best tags, the takeaways and the cost chart all use only these.
+  const sites = useMemo(() => {
+    const ticked = allSites.filter((site) => !hiddenSites.has(site.site_id));
+    return ticked.length > 0 ? ticked : allSites.slice(0, 1);
+  }, [allSites, hiddenSites]);
+  const shownIds = new Set(sites.map((site) => site.site_id));
+  const toggleSite = (id) => {
+    if (shownIds.has(id) && shownIds.size === 1) return;   // at least one site stays ticked
+    const nextShown = new Set(shownIds);
+    if (nextShown.has(id)) nextShown.delete(id); else nextShown.add(id);
+    setHiddenSites(new Set(allSites.map((site) => site.site_id).filter((other) => !nextShown.has(other))));
+  };
+
+  const insights = useMemo(() => buildInsights(sites), [sites]);
 
   const best = useMemo(() => ({
     sun: bestSites(sites, (site) => site.bodies?.sun?.visible_hours, Math.max),
@@ -136,8 +160,9 @@ const CompareView = ({ time, windowStart, isPlaying, onTogglePlay, onTimeChange,
   const flags = meta.quality_flags || [];
   // One line per kind of "unverified" flag, in plain words (the API's own messages are notes for developers).
   const unverified = [...new Set(flags.map((flag) => flag.code).filter((code) => code.includes('UNVERIFIED')))];
-  const periodStart = sites[0]?.period?.start_utc;
-  const periodMismatch = periodStart && new Date(periodStart).getTime() !== windowStart.getTime();
+  const period = sites[0].period;
+  // The app's own timeline covers one lunar day. The time marker and click-to-jump only make sense on that one.
+  const onTimeline = new Date(period.start_utc).getTime() === windowStart.getTime();
   const sourceLabel = {
     live: 'Live from the Stargazer API',
     snapshot: 'Saved copy of the Stargazer API',
@@ -152,7 +177,7 @@ const CompareView = ({ time, windowStart, isPlaying, onTogglePlay, onTimeChange,
             <span className="panel-kicker">MISSION PLANNING</span>
             <h2>Compare sites</h2>
             <p>
-              One 29.53-day lunar day from {formatDateTime(windowStart)}, {payload.horizon_model === 'lola_mask' ? 'LOLA terrain skyline' : payload.horizon_model}.
+              One {(period.hours / 24).toFixed(2)}-day lunar day, {formatDateTime(period.start_utc)} to {formatDateTime(period.end_utc)}, {payload.horizon_model === 'lola_mask' ? 'LOLA terrain skyline' : payload.horizon_model}.
               Geometric visibility only.
             </p>
           </div>
@@ -174,13 +199,78 @@ const CompareView = ({ time, windowStart, isPlaying, onTogglePlay, onTimeChange,
           </div>
         </div>
 
-        {periodMismatch && (
-          <p className="cv-warning">
-            These numbers cover a period starting {formatDateTime(periodStart)}, which is not the lunar day on the timeline.
+        <div className="cv-controls">
+          <div className="cv-control" role="radiogroup" aria-label="Lunar day">
+            <span className="cv-control-label">Lunar day</span>
+            <div className="cv-days">
+              {LUNAR_DAYS.map((option) => {
+                // Dates come from the payload on screen for the chosen day, and from the saved payloads for the others.
+                const dates = option.day === lunarDay ? period : option.period;
+                return (
+                  <button
+                    key={option.day}
+                    type="button"
+                    role="radio"
+                    aria-checked={option.day === lunarDay}
+                    className={option.day === lunarDay ? 'is-active' : ''}
+                    onClick={() => setLunarDay(option.day)}
+                  >
+                    <b>Lunar day {option.day}</b>
+                    <span>{formatDate(dates.start_utc)} to {formatDate(dates.end_utc)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <fieldset className="cv-control cv-site-picker">
+            <legend className="cv-control-label">Sites to compare</legend>
+            <div className="cv-site-options">
+              {allSites.map((site) => {
+                const checked = shownIds.has(site.site_id);
+                const isLast = checked && shownIds.size === 1;
+                return (
+                  <label
+                    key={site.site_id}
+                    className={`${checked ? 'is-checked' : ''}${isLast ? ' is-locked' : ''}`}
+                    title={isLast ? 'At least one site stays selected' : undefined}
+                  >
+                    <input type="checkbox" checked={checked} disabled={isLast} onChange={() => toggleSite(site.site_id)} />
+                    {site.name}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        </div>
+
+        {!onTimeline && (
+          <p className="cv-note">
+            The 3D view's timeline only covers lunar day 1, so the time marker and click-to-jump are off for this period.
           </p>
         )}
 
-        <div className="cv-cards">
+        {insights.length > 0 && (
+          <div className="cv-panel cv-insights" aria-live="polite">
+            <h3>{sites.length === 1 ? `Takeaways for ${sites[0].name}` : `Takeaways for these ${sites.length} sites`}</h3>
+            <ul>
+              {insights.map((insight) => (
+                <li key={insight.key}>
+                  <b>{insight.title}</b>
+                  <span>
+                    {insight.text}
+                    {insight.warning && <em className="cv-insight-warning"> Warning: {insight.warning}</em>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <small>
+              Worked out from the numbers below for the selected sites. Cost takeaways come from each site's own cost run,
+              so they do not change with the lunar day.
+            </small>
+          </div>
+        )}
+
+        <div className={`cv-cards cv-cards-${Math.min(sites.length, 3)}`}>
           {sites.map((site) => {
             const start = new Date(site.period.start_utc).getTime();
             const span = new Date(site.period.end_utc).getTime() - start;
@@ -211,9 +301,9 @@ const CompareView = ({ time, windowStart, isPlaying, onTogglePlay, onTimeChange,
                     <div className="cv-track-row" key={body.key}>
                       <span>{body.label}</span>
                       <div
-                        className="cv-track"
-                        onClick={seek}
-                        title={`${body.label} visible: click to set the time`}
+                        className={`cv-track${onTimeline ? '' : ' is-static'}`}
+                        onClick={onTimeline ? seek : undefined}
+                        title={onTimeline ? `${body.label} visible: click to set the time` : `${body.label} visible`}
                       >
                         {(site.windows?.[body.key] || []).map((window) => {
                           const from = window.overlap_start_utc || window.start_utc;
@@ -229,7 +319,7 @@ const CompareView = ({ time, windowStart, isPlaying, onTogglePlay, onTimeChange,
                             />
                           );
                         })}
-                        <b className="cv-now" style={{ left: `${nowPercent}%` }} />
+                        {onTimeline && <b className="cv-now" style={{ left: `${nowPercent}%` }} />}
                       </div>
                     </div>
                   ))}
@@ -296,6 +386,7 @@ const CompareView = ({ time, windowStart, isPlaying, onTogglePlay, onTimeChange,
                       )}
                       <small>
                         Cost run: lands {formatDateTime(site.cost.landing_time_utc)}, {site.cost.mission_days}-day mission.
+                        The same for every lunar day.
                       </small>
                     </>
                   ) : (
@@ -311,7 +402,7 @@ const CompareView = ({ time, windowStart, isPlaying, onTogglePlay, onTimeChange,
           <div className="cv-panel">
             <h3>Modelled cost per usable hour: median, with the P10 to P90 range</h3>
             <p>$M per usable hour. Each bar runs from P10 to P90; the tick is the median. Lower is cheaper.</p>
-            <div className="cv-chart">
+            <div className="cv-chart" style={{ height: `${4 + chartRows.length * 2.5}rem` }}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartRows} layout="vertical" margin={{ top: 18, right: 24, bottom: 4, left: 8 }}>
                   <CartesianGrid horizontal={false} stroke="rgba(148, 163, 184, 0.16)" />
