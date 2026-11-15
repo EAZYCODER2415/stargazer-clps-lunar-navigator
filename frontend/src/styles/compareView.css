@@ -1,0 +1,437 @@
+/* Full "Compare sites" view. It sits under the mission header (top is set from the header's measured height). */
+.compare-view {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 39;
+  overflow-y: auto;
+  background: rgba(5, 9, 17, 0.97);
+  color: #cbd5e1;
+  backdrop-filter: blur(12px);
+}
+
+.cv-inner {
+  max-width: 96rem;
+  margin: 0 auto;
+  padding: 0.9rem 1rem 2rem;
+}
+
+.cv-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.cv-head h2 {
+  margin: 0.1rem 0 0.2rem;
+  color: #f8fafc;
+  font-size: 1.15rem;
+}
+
+.cv-head p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.74rem;
+}
+
+.cv-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+}
+
+.cv-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid rgba(71, 85, 105, 0.7);
+  border-radius: 0.28rem;
+  color: #e2e8f0;
+}
+
+.cv-source i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #64748b;
+}
+
+.cv-source-live i { background: #34d399; }
+.cv-source-snapshot i { background: #fbbf24; }
+
+.cv-source b {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.cv-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #f8fafc;
+}
+
+.cv-clock button,
+.cv-close {
+  display: inline-flex;
+  width: 1.9rem;
+  height: 1.9rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(71, 85, 105, 0.7);
+  border-radius: 0.28rem;
+  background: rgba(15, 23, 42, 0.78);
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.cv-clock button:hover,
+.cv-close:hover {
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+
+.cv-clock svg,
+.cv-close svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.cv-warning {
+  margin: 0 0 0.8rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #f59e0b;
+  border-radius: 0.35rem;
+  color: #fde68a;
+  font-size: 0.76rem;
+}
+
+.cv-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.cv-card,
+.cv-panel {
+  padding: 0.8rem;
+  border: 1px solid rgba(71, 85, 105, 0.6);
+  border-radius: 0.5rem;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.cv-card-head {
+  margin-bottom: 0.7rem;
+}
+
+.cv-card h3,
+.cv-panel h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 0.9rem;
+}
+
+.cv-card-head span {
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+}
+
+/* Window bars */
+.cv-track-row {
+  display: grid;
+  grid-template-columns: 2.7rem minmax(0, 1fr);
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+
+.cv-track-row > span {
+  color: #94a3b8;
+  font-size: 0.7rem;
+}
+
+.cv-track {
+  position: relative;
+  height: 0.95rem;
+  border-radius: 0.2rem;
+  background: rgba(148, 163, 184, 0.12);
+  cursor: pointer;
+}
+
+.cv-track:hover {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.cv-window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 2px;
+  border-radius: 0.2rem;
+}
+
+.cv-window-sun { background: #fbbf24; }
+.cv-window-earth { background: #60a5fa; }
+.cv-window-both { background: #34d399; }
+
+.cv-now {
+  position: absolute;
+  top: -0.2rem;
+  bottom: -0.2rem;
+  width: 2px;
+  margin-left: -1px;
+  background: #f8fafc;
+  box-shadow: 0 0 0 1px rgba(5, 9, 17, 0.9);
+  pointer-events: none;
+}
+
+.cv-axis > div {
+  position: relative;
+  height: 0.9rem;
+}
+
+.cv-axis small {
+  position: absolute;
+  top: 0;
+  padding-left: 0.2rem;
+  border-left: 1px solid rgba(148, 163, 184, 0.4);
+  color: #64748b;
+  font-size: 0.62rem;
+  line-height: 0.9rem;
+  white-space: nowrap;
+}
+
+/* The last day label sits to the left of its tick so it stays inside the card. */
+.cv-axis small.is-end {
+  padding: 0 0.2rem 0 0;
+  border-right: 1px solid rgba(148, 163, 184, 0.4);
+  border-left: 0;
+  transform: translateX(-100%);
+}
+
+/* Quick stats */
+.cv-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  min-height: 7.6rem;   /* same height in every card, so the rows line up across sites */
+  margin-top: 0.7rem;
+}
+
+.cv-stat,
+.cv-cost-row > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid rgba(71, 85, 105, 0.45);
+  border-radius: 0.35rem;
+}
+
+.cv-stat.is-best,
+.cv-cost-row > div.is-best {
+  border-color: rgba(52, 211, 153, 0.75);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.cv-stat-label,
+.cv-cost-row span {
+  color: #94a3b8;
+  font-size: 0.66rem;
+}
+
+.cv-stat strong,
+.cv-cost-row strong {
+  color: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+}
+
+.cv-stat small {
+  color: #94a3b8;
+  font-size: 0.64rem;
+  line-height: 1.3;
+}
+
+.cv-best {
+  align-self: flex-start;
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.2rem;
+  background: #34d399;
+  color: #04130d;
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Cost */
+.cv-cost {
+  margin-top: 0.7rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(71, 85, 105, 0.45);
+}
+
+.cv-cost-title {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: #fbbf24;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cv-cost-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.3rem;
+  min-height: 5.4rem;
+}
+
+.cv-cost-row strong {
+  font-size: 0.86rem;
+}
+
+.cv-cost small,
+.cv-zero {
+  display: block;
+  margin: 0.45rem 0 0;
+  color: #94a3b8;
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
+.cv-zero {
+  color: #fde68a;
+}
+
+/* Chart */
+.cv-panel {
+  margin-top: 0.75rem;
+}
+
+.cv-panel > p {
+  margin: 0.2rem 0 0;
+  color: #94a3b8;
+  font-size: 0.7rem;
+}
+
+.cv-chart {
+  height: 11.5rem;
+  margin-top: 0.4rem;
+}
+
+.cv-range-bar {
+  fill: rgba(251, 191, 36, 0.55);
+}
+
+.cv-range-median {
+  stroke: #f8fafc;
+  stroke-width: 2;
+}
+
+.cv-range-label {
+  fill: #e2e8f0;
+  font-size: 11px;
+}
+
+.cv-tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(71, 85, 105, 0.8);
+  border-radius: 0.35rem;
+  background: #0b1220;
+  color: #e2e8f0;
+  font-size: 0.72rem;
+}
+
+.cv-tooltip small {
+  color: #94a3b8;
+}
+
+/* Small print and sources */
+.cv-smallprint p {
+  margin: 0.6rem 0 0;
+  color: #94a3b8;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.cv-smallprint b {
+  color: #cbd5e1;
+}
+
+.cv-sources ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cv-sources li {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: baseline;
+  font-size: 0.72rem;
+}
+
+.cv-source-role {
+  color: #94a3b8;
+}
+
+.cv-sources a {
+  overflow: hidden;
+  color: #7dd3fc;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cv-sources small,
+.cv-flag {
+  color: #94a3b8;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.cv-flag {
+  margin: 0.35rem 0 0;
+}
+
+.cv-unverified {
+  display: inline-block;
+  margin: 0 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid #f59e0b;
+  border-radius: 0.2rem;
+  color: #fbbf24;
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cv-flag .cv-unverified {
+  margin-left: 0;
+}
+
+@media (max-width: 1100px) {
+  .cv-cards {
+    grid-template-columns: 1fr;
+  }
+}

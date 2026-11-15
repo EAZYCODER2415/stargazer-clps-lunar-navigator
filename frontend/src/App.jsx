@@ -14,7 +14,7 @@ import {
   getBestOverlap
 } from './utils/ephemerisRuntime';
 import './styles/horizonTracker.css';
-import ComparisonPanel from './components/ComparisonPanel';
+import CompareView from './components/CompareView';
 import HelpCard from './components/HelpCard';
 import landingSites from './data/landingSites.json';
 
@@ -42,6 +42,7 @@ function App() {
   const [showHorizonMask, setShowHorizonMask] = useState(false);   // survey grid over the ground: off until asked for
   const [invertLook, setInvertLook] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
+  const closeComparison = useCallback(() => setShowComparison(false), []);
   const [showInterface, setShowInterface] = useState(true);
   const [cameraSensitivity, setCameraSensitivity] = useState(1.8);
   const [cameraInfo, setCameraInfo] = useState(null);
@@ -301,7 +302,14 @@ function App() {
               cameraInfo={cameraInfo}
             />
             {showComparison && (
-              <ComparisonPanel selectedSite={selectedSite} selectedDate={windowStart} onClose={() => setShowComparison(false)} />
+              <CompareView
+                time={time}
+                windowStart={windowStart}
+                isPlaying={isPlaying}
+                onTogglePlay={togglePlay}
+                onTimeChange={handleTimeChange}
+                onClose={closeComparison}
+              />
             )}
             {!showComparison && (
               <button type="button" className="compare-launch-button" onClick={() => setShowComparison(true)}>
