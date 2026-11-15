@@ -1582,40 +1582,6 @@ header {
   accent-color: #f59e0b;
 }
 
-.comparison-panel {
-  position: fixed;
-  right: 1rem;
-  bottom: calc(32vh + 0.75rem);
-  z-index: 35;
-  width: min(34rem, calc(100% - 1.5rem));
-  padding: 0.8rem;
-  border: 1px solid rgba(71, 85, 105, 0.7);
-  border-radius: 0.55rem;
-  background: rgba(15, 23, 42, 0.96);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(12px);
-}
-
-.comparison-panel-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.comparison-panel-header h2 {
-  margin: 0.1rem 0 0;
-  color: #f8fafc;
-  font-size: 0.95rem;
-}
-
-.comparison-panel-header button {
-  border: 0;
-  background: transparent;
-  color: #94a3b8;
-  cursor: pointer;
-  font-size: 1.1rem;
-}
-
 .aerial-overlay-actions button,
 .aerial-label {
   pointer-events: auto;
@@ -1625,48 +1591,6 @@ header {
   color: #fbbf24;
   font-size: 0.68rem;
   letter-spacing: 0.08em;
-}
-
-.comparison-panel-note {
-  margin: 0.55rem 0;
-  color: #94a3b8;
-  font-size: 0.72rem;
-  line-height: 1.4;
-}
-
-.comparison-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
-}
-
-.comparison-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  border: 1px solid rgba(71, 85, 105, 0.5);
-  border-radius: 0.35rem;
-  color: #cbd5e1;
-  font-size: 0.72rem;
-}
-
-.comparison-card strong {
-  color: #f8fafc;
-  font-size: 0.72rem;
-}
-
-.comparison-card span,
-.comparison-card small {
-  color: #64748b;
-}
-
-.comparison-card small {
-  font-size: 0.68rem;
-}
-
-.comparison-card b {
-  color: #fbbf24;
 }
 
 .timeline-deck-bottom {
