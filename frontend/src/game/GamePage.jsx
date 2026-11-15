@@ -1,8 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import landingSites from '../data/landingSites.json';
 import { calculateEarthPosition, calculateSunPosition, clearanceOf } from '../utils/ephemerisRuntime';
-import { GAME_SPEEDS, LAUNCH_WINDOWS, PROPELLANT_LOAD_SECONDS, SCENARIO_START, SURVEY_DURATION_SECONDS, createInitialState, getActiveWindow, getLaunchReadiness, getWindowStatus, reducer } from './gameEngine';
+import { PROPELLANT_LOAD_SECONDS, SCENARIO_START, SURVEY_DURATION_SECONDS, createInitialState, getLaunchReadiness, reducer } from './gameEngine';
+import DebugMenu from './DebugMenu';
+import { DEBUG_ENABLED, useKonamiCode } from './debugMode';
 import GameGuide from './GameGuide';
+import MissionHeader, { StageProgress } from './MissionHeader';
 import MissionPlanning from './MissionPlanning';
 import { Ascent, Assembly, AssemblyHotspots, Button, Countdown, Landing, Transit } from './StagePanels';
 import './game.css';
@@ -17,41 +20,22 @@ const ASSEMBLY_NOTES = {
 };
 
 const phaseInfo = {
-  assembly: ['01 · ASSEMBLY', 'Build the launch stack', 'Drag each part from the rack onto the vehicle, or click a part and then click where it goes.'],
-  'assembly-complete': ['01 · ASSEMBLY', 'Vehicle assembled', 'Review the stack, then move to pad preparation.'],
-  launchpad: ['02 · LAUNCH PAD', 'Prepare for launch', 'Complete the pad procedure and watch for a scenario launch window.'],
-  countdown: ['03 · COUNTDOWN', 'Terminal countdown', 'Hold the launch command until the T−0 cue.'],
-  ascent: ['04 · ASCENT', 'Manage ascent and staging', 'Separate spent stages at the cues, then release the lander.'],
-  transit: ['05 · TRANSIT', 'Monitor the lunar transit', 'Switch between vehicle monitoring and Communications as the mission clock continues.'],
-  landing: ['06 · LANDING', 'Guide the powered descent', 'Choose a training zone, manage thrust, and confirm touchdown.'],
-  'lunar-operations': ['07 · LUNAR OPERATIONS', 'Complete the first rover survey', 'Review local illumination and Earth visibility using the site’s existing lunar data.'],
-  'no-launch': ['PREPARATION DEADLINE', 'The planned schedule expired', 'The selected lunar operating window and the game launch opportunities are separate. Review the plan and choose a later opportunity for more preparation time.'],
+  assembly: ['STAGE 1 · ASSEMBLY', 'Build the launch stack', 'Drag each part from the rack onto the vehicle, or click a part and then click where it goes.'],
+  'assembly-complete': ['STAGE 1 · ASSEMBLY', 'Vehicle assembled', 'Review the stack, then move to pad preparation.'],
+  launchpad: ['STAGE 2 · LAUNCH PREPARATION', 'Prepare for launch', 'Complete the pad procedure and get all three lights green before the preparation deadline.'],
+  countdown: ['STAGE 2 · LAUNCH PREPARATION · COUNTDOWN', 'Terminal countdown', 'Hold the launch command until the T−0 cue.'],
+  ascent: ['STAGE 3 · ASCENT', 'Manage ascent and staging', 'Separate spent stages at the cues, then release the lander.'],
+  transit: ['STAGE 4 · TRANSIT', 'Monitor the lunar transit', 'Switch between vehicle monitoring and Communications as the mission clock continues.'],
+  landing: ['STAGE 5 · LUNAR LANDING', 'Guide the powered descent', 'Choose a training zone, manage thrust, and confirm touchdown.'],
+  'lunar-operations': ['STAGE 6 · LUNAR OPERATIONS', 'Complete the first rover survey', 'Review local illumination and Earth visibility using the site’s existing lunar data.'],
+  'no-launch': ['PREPARATION DEADLINE', 'The planned schedule expired', 'The vehicle was not ready before the game-clock preparation deadline. Return to planning and choose an opportunity that leaves more preparation time.'],
 };
-
-function clock(seconds) {
-  const total = Math.max(0, Math.floor(seconds));
-  return `T+${String(Math.floor(total / 3600)).padStart(2, '0')}:${String(Math.floor(total / 60) % 60).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-}
-
-function MissionTimeline({ state, dispatch }) {
-  const active = getActiveWindow(state);
-  return <section className="game-panel mission-timeline" aria-label="Scenario launch windows">
-    <div className="timeline-title"><span className="eyebrow">SCENARIO OPPORTUNITIES</span><span>Illustrative launch windows · not a real launch forecast</span></div>
-    <div className="window-track">{LAUNCH_WINDOWS.map((w) => {
-      const status = getWindowStatus(state, w);
-      return <article key={w.id} className={`window-card ${status}`}><div><b>{w.name}</b><span>{status === 'active' ? 'OPEN NOW' : status.toUpperCase()}</span></div><p>{w.condition}</p><small>{Math.floor(w.openAt / 60)}–{Math.floor(w.closeAt / 60)} min · {w.duration}</small>{status === 'active' && <Button className="text-button" onClick={() => dispatch({ type: 'SKIP_WINDOW', windowId: w.id })}>Skip this window</Button>}</article>;
-    })}</div>
-    {active && <p className="window-note">{active.description}</p>}
-  </section>;
-}
 
 function LaunchPad({ state, dispatch }) {
   const [dropActive, setDropActive] = useState(false);
   const [dropMessage, setDropMessage] = useState('');
   const readiness = getLaunchReadiness(state);
-  const active = readiness.activeWindow;
-  const assessWindow = active || LAUNCH_WINDOWS.find((w) => getWindowStatus(state, w) === 'upcoming');
-  const assessment = assessWindow && state.pad.weatherAssessment[assessWindow.id];
+  const weather = readiness.weather;
   const statuses = readiness.go.map((go, index) => ({ name: ['VEHICLE', 'SPACECRAFT', 'SITE / WEATHER'][index], go }));
   function makeEquipmentDraggable(event, action) {
     event.dataTransfer.effectAllowed = 'move';
@@ -86,11 +70,12 @@ function LaunchPad({ state, dispatch }) {
       {state.pad.propellantStartedAt !== null && !state.pad.propellantLoaded && <div className="progress-wrap"><div><span>SIMULATED LOADING</span><b>{Math.min(100, Math.floor((state.elapsed - state.pad.propellantStartedAt) / PROPELLANT_LOAD_SECONDS * 100))}%</b></div><progress max="100" value={Math.min(100, (state.elapsed - state.pad.propellantStartedAt) / PROPELLANT_LOAD_SECONDS * 100)} /></div>}
       <p className="stage-caveat">These are simplified training procedures. Scenario weather is deterministic game data, not a live forecast.</p>
     </div>
-    <div className="window-review"><span className="eyebrow">{active ? `${active.name} · OPEN` : assessWindow?.name || 'NO UPCOMING WINDOW'}</span><h3>Assess scenario weather</h3><p>{assessWindow?.description || 'No more launch windows are available in this scenario period.'}</p>{assessWindow && <><div className="weather-meter"><span>WIND</span><b>{assessWindow.weather === 'caution' ? 'VARIABLE · CAUTION' : 'STABLE · GO'}</b><i className={assessWindow.weather === 'caution' ? 'caution' : ''} /></div><div className="inline-actions weather-choice">{['go', 'caution', 'noGo'].map((choice) => <Button key={choice} className={state.pad.weatherChoice[assessWindow.id] === choice ? 'selected' : ''} onClick={() => dispatch({ type: 'SET_WEATHER_CHOICE', windowId: assessWindow.id, choice })}>{choice === 'noGo' ? 'NO-GO' : choice.toUpperCase()}</Button>)}</div><Button onClick={() => dispatch({ type: 'ASSESS_WEATHER', windowId: assessWindow.id })}>Record assessment</Button>{assessment && <p className="feedback" role="status">{state.pad.feedback || (assessment.correct ? `Assessment recorded: ${assessment.choice.toUpperCase()}.` : 'Review the indicator and reassess.')}</p>}</>}
-        {assessWindow && <Button onClick={() => dispatch({ type: 'CHECK_PAD_ITEM', key: 'site', windowId: assessWindow.id })} disabled={state.pad.checks.site}>Complete launch-site check</Button>}
+    <div className="window-review"><span className="eyebrow">RANGE WEATHER · FIXED SCENARIO DATA</span><h3>Inspect the weather</h3><p>One training condition on the mission clock: upper-level winds start above limits and ease {Math.ceil(weather.remaining) > 0 ? `in about ${Math.ceil(weather.remaining)} mission seconds` : 'early in pad preparation'}. It is not a forecast.</p>
+        <div className="weather-meter"><span>UPPER-LEVEL WIND</span><b>{weather.clear ? 'WITHIN LIMITS · SUITABLE' : `ABOVE LIMITS · EASES IN ${Math.ceil(weather.remaining)} S`}</b><i className={weather.clear ? '' : 'caution'} /></div>
+        <div className="inline-actions weather-choice"><Button onClick={() => dispatch({ type: 'ASSESS_WEATHER' })} disabled={state.pad.weatherAssessed}>{state.pad.weatherAssessed ? 'Weather inspected ✓' : 'Inspect weather'}</Button><Button onClick={() => dispatch({ type: 'CHECK_PAD_ITEM', key: 'site' })} disabled={state.pad.checks.site}>{state.pad.checks.site ? 'Launch site ✓' : 'Complete launch-site check'}</Button></div>
         <div className="go-lights">{statuses.map((item) => <div key={item.name}><i className={item.go ? 'on' : ''} /><b>{item.name}</b><span>{item.go ? 'GO' : 'WAIT'}</span></div>)}</div>
         {state.pad.feedback && <p className="feedback" role="status">{state.pad.feedback}</p>}
-        <Button className="primary-action" disabled={!readiness.allGo || !active} onClick={() => dispatch({ type: 'START_COUNTDOWN' })}>{active ? readiness.allGo ? 'Begin terminal countdown' : 'Complete pad gates to continue' : 'Waiting for launch window'}</Button>
+        <Button className="primary-action" disabled={!readiness.canLaunch} onClick={() => dispatch({ type: 'START_COUNTDOWN' })}>{readiness.allGo ? 'Begin terminal countdown' : 'Get all three lights green to continue'}</Button>
     </div>
   </section>;
 }
@@ -98,7 +83,7 @@ function LaunchPad({ state, dispatch }) {
 function LunarOperations({ state, dispatch, site, conditions, simTime }) {
   const [camera, setCamera] = useState({ yaw: 0, pitch: 0 });
   const ops = state.lunarOps; const surveyElapsed = ops.surveyStartedAt === null ? 0 : state.elapsed - ops.surveyStartedAt;
-  return <section className="game-panel phase-panel lunar-phase"><span className="eyebrow">SURFACE MISSION · EXISTING SITE DATA</span><h2>First rover survey at {site.name}</h2><p className="science-caveat">Sun and Earth visibility below use Stargazer’s existing lunar ephemeris and terrain-horizon data at the selected coordinates and simulated UTC. The selected operating window advances across the 75-second survey for gameplay. Visibility does not establish usable power or communications performance. Launch windows and weather remain scenario-only.</p>
+  return <section className="game-panel phase-panel lunar-phase"><span className="eyebrow">SURFACE MISSION · EXISTING SITE DATA</span><h2>First rover survey at {site.name}</h2><p className="science-caveat">Sun and Earth visibility below use Stargazer’s existing lunar ephemeris and terrain-horizon data at the selected coordinates and simulated UTC. The selected operating window advances across the 75-second survey for gameplay. Visibility does not establish usable power or communications performance. Launch timing and weather remain scenario-only.</p>
     <div className="lunar-scene-frame"><Suspense fallback={<div className="scene-loading">Preparing lunar horizon…</div>}><LunarScene3D time={simTime} windowStart={SCENARIO_START} selectedSite={site} showSolarFlux showDTELink showGrid showHorizonMask useTerrain cameraYaw={camera.yaw} cameraPitch={camera.pitch} viewMode="surface" viewResetCount={0} invertLook={false} onLookDrag={(dx, dy) => setCamera((current) => ({ yaw: current.yaw + dx, pitch: Math.max(-80, Math.min(80, current.pitch + dy)) }))} onCameraInfo={() => {}} cameraInfo={null} showInterface={false} /></Suspense><span className="scene-caption">Terrain skyline uses the existing horizon mask; nearby ground is illustrative. Drag to look around.</span></div>
     <div className="science-grid"><article><span className="eyebrow sun-color">SUN · GEOMETRIC VISIBILITY</span><b>{conditions.sunVisible ? 'ABOVE LOCAL HORIZON' : 'BELOW LOCAL HORIZON'}</b><small>{conditions.sun.elevation.toFixed(2)}° elevation · {conditions.sun.azimuth.toFixed(1)}° azimuth</small><small>{conditions.sunClearance.toFixed(2)}° clearance from terrain mask</small></article><article><span className="eyebrow earth-color">EARTH · GEOMETRIC VISIBILITY</span><b>{conditions.earthVisible ? 'ABOVE LOCAL HORIZON' : 'BELOW LOCAL HORIZON'}</b><small>{conditions.earth.elevation.toFixed(2)}° elevation · {conditions.earth.azimuth.toFixed(1)}° azimuth</small><small>{conditions.earthClearance.toFixed(2)}° clearance from terrain mask</small></article></div><small className="sim-time">SIMULATED SITE TIME · {simTime.toISOString().replace('T', ' ').slice(0, 19)} UTC</small>
     {!ops.roverDeployed && <Button className="primary-action" onClick={() => dispatch({ type: 'DEPLOY_ROVER' })}>Deploy rover</Button>}{ops.roverDeployed && ops.surveyStartedAt === null && <Button className="primary-action" onClick={() => dispatch({ type: 'START_SURVEY' })}>Start 75-second survey</Button>}{ops.surveyStartedAt !== null && !ops.surveyComplete && <><div className="descent-meter"><div><span>ROVER SURVEY</span><b>{Math.min(100, Math.floor(surveyElapsed / SURVEY_DURATION_SECONDS * 100))}%</b></div><progress max="100" value={Math.min(100, surveyElapsed / SURVEY_DURATION_SECONDS * 100)} /></div><Button className="primary-action" disabled={surveyElapsed < SURVEY_DURATION_SECONDS} onClick={() => dispatch({ type: 'COMPLETE_SURVEY', sunVisible: conditions.sunVisible, earthVisible: conditions.earthVisible })}>Complete survey and review</Button></>}{ops.surveyComplete && <div className="mission-complete"><span className="eyebrow">MISSION 001 COMPLETE</span><h3>Robotic lander reached the surface and completed its first survey.</h3><p>Sun: {ops.surveyResult?.sunVisible ? 'above' : 'below'} the local terrain horizon. Earth: {ops.surveyResult?.earthVisible ? 'above' : 'below'} the local terrain horizon.</p><Button onClick={() => dispatch({ type: 'RESTART' })}>Play mission again</Button></div>}</section>;
@@ -107,6 +92,10 @@ function LunarOperations({ state, dispatch, site, conditions, simTime }) {
 function GamePage() {
   const [state, dispatch] = useReducer(reducer, undefined, createInitialState);
   const [showGuide, setShowGuide] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [planningRun, setPlanningRun] = useState(0);
+  useKonamiCode(useCallback(() => setShowDebug(true), []));
+  const closeDebug = useCallback(() => setShowDebug(false), []);
   // Assembly-only interface state shared by the 3D scene, the keyboard hotspots and the panel.
   const [assemblyUi, setAssemblyUi] = useState(ASSEMBLY_UI);
   const [assemblyLayout, setAssemblyLayout] = useState(null);
@@ -125,7 +114,7 @@ function GamePage() {
     lastTickRef.current = performance.now();
     const timer = window.setInterval(() => {
       const now = performance.now(); const previous = lastTickRef.current ?? now; lastTickRef.current = now;
-      dispatch({ type: 'TICK', delta: ((now - previous) / 1000) * GAME_SPEEDS[state.speed], siteName: landingSites.find((s) => s.id === state.siteId)?.name });
+      dispatch({ type: 'TICK', delta: ((now - previous) / 1000) * state.speed, siteName: landingSites.find((s) => s.id === state.siteId)?.name });
     }, 100);
     return () => { window.clearInterval(timer); lastTickRef.current = null; };
   }, [state.paused, state.phase, state.speed, state.siteId]);
@@ -148,19 +137,22 @@ function GamePage() {
   const usesMissionScene = ['assembly', 'assembly-complete', 'launchpad', 'countdown', 'ascent', 'transit', 'landing'].includes(state.phase);
   const transitElapsed = state.transit ? state.elapsed - state.transit.startedAt : 0;
   const info = phaseInfo[state.phase] || phaseInfo.assembly;
+  const resetLocalUi = () => { setAssemblyUi(ASSEMBLY_UI); setShowGuide(false); setShowDebug(false); setPlanningRun((run) => run + 1); };
+  const debugMenu = DEBUG_ENABLED && showDebug ? <DebugMenu state={state} onClose={closeDebug} onJump={(stage) => { dispatch({ type: 'DEBUG_JUMP', stage, siteName: site.name }); resetLocalUi(); }} onRestart={() => { dispatch({ type: 'RESTART' }); resetLocalUi(); }} /> : null;
   if (state.phase === 'planning') {
-    return <MissionPlanning onCommit={(plan) => { dispatch({ type: 'COMMIT_MISSION_PLAN', plan }); setAssemblyUi(ASSEMBLY_UI); setShowGuide(true); }} />;
+    return <><MissionPlanning key={planningRun} onCommit={(plan) => { dispatch({ type: 'COMMIT_MISSION_PLAN', plan }); setAssemblyUi(ASSEMBLY_UI); setShowGuide(true); }} />{debugMenu}</>;
   }
   const openGuide = () => { if (!state.paused && !state.briefingOpen) dispatch({ type: 'TOGGLE_PAUSE' }); setShowGuide(true); };
   const closeGuide = () => { setShowGuide(false); if (state.briefingOpen) dispatch({ type: 'BEGIN_BRIEFING' }); };
   return <main className={`game-page lunar-game game-phase-${state.phase}`}>
     {showGuide && <GameGuide onClose={closeGuide} />}
+    {debugMenu}
     {usesMissionScene && <Suspense fallback={<div className="mission-scene-background scene-loading" aria-hidden="true" />}><MissionScene3D phase={state.phase} elapsed={state.elapsed} installedParts={state.installedParts} pad={state.pad} ascent={state.ascent} landing={state.landing} transitElapsed={transitElapsed} assembly={assemblyUi} onInstall={assemblyActions.install} onSelectPart={assemblyActions.select} onHoverPart={assemblyActions.hover} onDragPart={assemblyActions.drag} onMiss={assemblyActions.miss} onLayout={onAssemblyLayout} /></Suspense>}
-    <header className="mission-topbar"><a className="mission-brand" href="/"><img src="/favicon.svg" alt="" /><div><span>STARGAZER · LUNAR MISSION SIMULATOR</span><h1>MISSION 001 <i>GET A ROBOTIC LANDER TO THE MOON</i></h1></div></a><div className="clock-console"><div><small>MISSION ELAPSED TIME</small><strong>{clock(state.elapsed)}</strong></div><div className="clock-controls"><Button onClick={() => dispatch({ type: 'TOGGLE_PAUSE' })} disabled={state.phase === 'no-launch'}>{state.paused ? 'Resume clock' : 'Pause clock'}</Button><label>Speed<select value={state.speed} onChange={(event) => dispatch({ type: 'SET_SPEED', speed: event.target.value })}><option value="slow">Slow</option><option value="normal">Normal</option></select></label><Button onClick={openGuide}>Mission guide</Button></div></div></header>
-    {['assembly', 'assembly-complete', 'launchpad', 'countdown'].includes(state.phase) && <MissionTimeline state={state} dispatch={dispatch} />}
-    <div className="phase-heading"><div><span className="eyebrow">{info[0]}</span><h2>{info[1]}</h2><p>{info[2]}</p></div>{state.missionPlan ? <div className="mission-target"><span>PLANNED SURFACE OPPORTUNITY · NOT A LAUNCH WINDOW</span><b>{state.missionPlan.siteName}</b><small>{state.missionPlan.selectedWindow.startTime.slice(0, 16).replace('T', ' ')} UTC → {state.missionPlan.selectedWindow.endTime.slice(0, 16).replace('T', ' ')} UTC</small>{['assembly', 'launchpad', 'countdown'].includes(state.phase) && <small>PREPARATION DEADLINE {clock(state.missionPlan.preparationDeadlineSeconds)} · REMAINING {clock(Math.max(0, state.missionPlan.preparationDeadlineSeconds - state.elapsed)).replace('T+', '')}</small>}</div> : <label className="site-picker">DESTINATION<select value={site.id} onChange={(e) => dispatch({ type: 'SELECT_SITE', siteId: e.target.value, siteName: landingSites.find((s) => s.id === e.target.value)?.name })} disabled={!['assembly', 'assembly-complete', 'launchpad'].includes(state.phase)}>{landingSites.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}</div>
+    <MissionHeader state={state} onTogglePause={() => dispatch({ type: 'TOGGLE_PAUSE' })} onSpeed={(speed) => dispatch({ type: 'SET_SPEED', speed })} onGuide={openGuide} />
+    <StageProgress phase={state.phase} />
+    <div className="phase-heading"><div><span className="eyebrow">{info[0]}</span><h2>{info[1]}</h2><p>{info[2]}</p></div></div>
     {usesMissionScene && <AssemblyHotspots state={state} ui={assemblyUi} layout={assemblyLayout} actions={assemblyActions} />}
-    {state.phase === 'assembly' || state.phase === 'assembly-complete' ? <Assembly state={state} dispatch={dispatch} ui={assemblyUi} /> : state.phase === 'launchpad' ? <LaunchPad state={state} dispatch={dispatch} /> : state.phase === 'countdown' ? <Countdown state={state} dispatch={dispatch} siteName={site.name} /> : state.phase === 'ascent' ? <Ascent state={state} dispatch={dispatch} /> : state.phase === 'transit' ? <Transit state={state} dispatch={dispatch} /> : state.phase === 'landing' ? <Landing state={state} dispatch={dispatch} /> : state.phase === 'lunar-operations' ? <LunarOperations state={state} dispatch={dispatch} site={site} conditions={conditions} simTime={simTime} /> : <section className="game-panel phase-panel no-launch-phase"><span className="eyebrow">MISSION SCHEDULE</span><h2>Preparation period ended</h2><p>The planned schedule reached its simplified preparation deadline before a launch. Return to planning to compare another recorded surface opportunity. This deadline is game scheduling only, not a real rocket launch time.</p><Button onClick={() => { dispatch({ type: 'RESTART' }); setShowGuide(false); }}>Return to planning</Button></section>}
+    {state.phase === 'assembly' || state.phase === 'assembly-complete' ? <Assembly state={state} dispatch={dispatch} ui={assemblyUi} /> : state.phase === 'launchpad' ? <LaunchPad state={state} dispatch={dispatch} /> : state.phase === 'countdown' ? <Countdown state={state} dispatch={dispatch} siteName={site.name} /> : state.phase === 'ascent' ? <Ascent state={state} dispatch={dispatch} /> : state.phase === 'transit' ? <Transit state={state} dispatch={dispatch} /> : state.phase === 'landing' ? <Landing state={state} dispatch={dispatch} /> : state.phase === 'lunar-operations' ? <LunarOperations state={state} dispatch={dispatch} site={site} conditions={conditions} simTime={simTime} /> : <section className="game-panel phase-panel no-launch-phase"><span className="eyebrow">MISSION SCHEDULE</span><h2>Preparation period ended</h2><p>The planned schedule reached its simplified preparation deadline before a launch. Return to planning to compare another recorded surface opportunity. This deadline is game scheduling only, not a real rocket launch time.</p><Button onClick={() => { dispatch({ type: 'RESTART' }); setShowGuide(false); setPlanningRun((run) => run + 1); }}>Return to planning</Button></section>}
   </main>;
 }
 

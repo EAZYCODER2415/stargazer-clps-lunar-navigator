@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSEMBLY_COMPONENTS, LAUNCH_WINDOWS, createInitialState, getActiveWindow, getLaunchReadiness, getWindowStatus, reducer } from './gameEngine.js';
+import { ASSEMBLY_COMPONENTS, GAME_SPEEDS, MISSION_STAGES, WEATHER_HOLD_SECONDS, createInitialState, getLaunchReadiness, getStageIndex, getWeather, reducer } from './gameEngine.js';
 
 const send = (state, type, fields = {}) => reducer(state, { type, ...fields });
 const tick = (state, delta) => send(state, 'TICK', { delta });
@@ -18,7 +18,7 @@ function enterMission() {
   return state;
 }
 
-function preparedAtFirstWindow() {
+function preparedOnPad() {
   let state = enterMission();
   for (const part of ASSEMBLY_COMPONENTS) state = send(state, 'INSTALL_PART', { partId: part.id, slotId: part.slot });
   state = send(state, 'PROCEED_TO_PAD');
@@ -29,11 +29,8 @@ function preparedAtFirstWindow() {
   state = tick(state, 35);
   state = send(state, 'CHECK_PAD_ITEM', { key: 'vehicle' });
   state = send(state, 'CHECK_PAD_ITEM', { key: 'spacecraft' });
-  state = send(state, 'SET_WEATHER_CHOICE', { windowId: 'window-1', choice: 'go' });
-  state = send(state, 'ASSESS_WEATHER', { windowId: 'window-1' });
   state = send(state, 'RETRACT_PLATFORM');
   state = send(state, 'SWITCH_ONBOARD_POWER');
-  state = send(state, 'CHECK_PAD_ITEM', { key: 'site', windowId: 'window-1' });
   return state;
 }
 
@@ -51,8 +48,22 @@ test('mission planning is manual and committing starts a paused, configurable mi
   assert.equal(state.paused, false);
   state = send(state, 'TOGGLE_PAUSE');
   assert.equal(tick(state, 60).elapsed, 0);
-  state = send(state, 'SET_SPEED', { speed: 'normal' });
-  assert.equal(state.speed, 'normal');
+});
+
+test('six clock speeds, 1.0x by default, and speed changes keep elapsed time', () => {
+  assert.deepEqual(GAME_SPEEDS, [0.5, 1, 1.5, 2, 2.5, 3]);
+  let state = createInitialState();
+  assert.equal(state.speed, 1);
+  state = enterMission();
+  state = tick(state, 10);
+  for (const speed of GAME_SPEEDS) {
+    state = send(state, 'SET_SPEED', { speed });
+    assert.equal(state.speed, speed);
+    assert.equal(state.elapsed, 10);
+  }
+  assert.equal(send(state, 'SET_SPEED', { speed: 4 }).speed, 3);
+  assert.equal(send(state, 'SET_SPEED', { speed: 'normal' }).speed, 3);
+  assert.equal(send(state, 'RESTART').speed, 1);
 });
 
 test('committed site is locked and its selected window sets the preparation deadline', () => {
@@ -82,37 +93,87 @@ test('assembly requires matching sockets and persists through pad preparation', 
   assert.equal(state.installedParts.length, ASSEMBLY_COMPONENTS.length);
 });
 
-test('windows retain preparation progress and only the active window can start countdown', () => {
-  let state = enterMission();
-  state = tick(state, LAUNCH_WINDOWS[0].openAt);
-  assert.equal(getWindowStatus(state, LAUNCH_WINDOWS[0]), 'active');
-  assert.equal(getActiveWindow(state).id, 'window-1');
-  state = send(state, 'SKIP_WINDOW', { windowId: 'window-1' });
-  assert.equal(getWindowStatus(state, LAUNCH_WINDOWS[0]), 'skipped');
-  state = tick(state, LAUNCH_WINDOWS[1].openAt - state.elapsed);
-  assert.equal(getActiveWindow(state).id, 'window-2');
-  assert.equal(state.phase, 'assembly');
+test('weather is one fixed condition that clears on the mission clock and must be inspected', () => {
+  let state = preparedOnPad();
+  assert.equal(state.elapsed, 35);
+  assert.equal(getWeather(state).clear, false);
+  assert.deepEqual(getLaunchReadiness(state).go, [true, true, false]);
+  state = send(state, 'ASSESS_WEATHER');
+  assert.equal(state.pad.weatherAssessed, false);
+  assert.match(state.pad.feedback, /still above limits/);
+  state = send(state, 'CHECK_PAD_ITEM', { key: 'site' });
+  assert.equal(state.pad.checks.site, false);
+  assert.equal(send(state, 'START_COUNTDOWN').phase, 'launchpad');
+  state = tick(state, WEATHER_HOLD_SECONDS - 35);
+  assert.equal(getWeather(state).clear, true);
+  assert.equal(getLaunchReadiness(state).weatherReady, false);
+  state = send(state, 'ASSESS_WEATHER');
+  assert.equal(state.pad.weatherAssessed, true);
+  state = send(state, 'CHECK_PAD_ITEM', { key: 'site' });
+  assert.deepEqual(getLaunchReadiness(state).go, [true, true, true]);
 });
 
-test('pad readiness gates propellant, checks, site clearance, and active assessed weather', () => {
-  const state = preparedAtFirstWindow();
-  assert.equal(state.elapsed, 35);
-  assert.equal(state.pad.propellantLoaded, true);
-  assert.deepEqual(getLaunchReadiness(state).go, [true, true, false]);
-  let atWindow = tick(state, LAUNCH_WINDOWS[0].openAt - state.elapsed);
-  assert.equal(getLaunchReadiness(atWindow).allGo, true);
-  atWindow = send(atWindow, 'START_COUNTDOWN');
-  assert.equal(atWindow.phase, 'countdown');
-  const tooEarly = send(atWindow, 'LAUNCH', { siteName: 'Malapert' });
+test('launch needs all three lights before the preparation deadline, with no launch windows', () => {
+  let state = tick(preparedOnPad(), WEATHER_HOLD_SECONDS);
+  state = send(state, 'ASSESS_WEATHER');
+  state = send(state, 'CHECK_PAD_ITEM', { key: 'site' });
+  assert.equal(getLaunchReadiness(state).canLaunch, true);
+  const late = tick(state, 1710);
+  assert.equal(late.phase, 'no-launch');
+  assert.equal(send(late, 'START_COUNTDOWN').phase, 'no-launch');
+  state = send(state, 'START_COUNTDOWN');
+  assert.equal(state.phase, 'countdown');
+  const tooEarly = send(state, 'LAUNCH', { siteName: 'Malapert' });
   assert.equal(tooEarly.phase, 'countdown');
-  const atCue = tick(atWindow, 12);
-  const launched = send(atCue, 'LAUNCH', { siteName: 'Malapert' });
+  const launched = send(tick(state, 12), 'LAUNCH', { siteName: 'Malapert' });
   assert.equal(launched.phase, 'ascent');
-  assert.equal(launched.usedWindowId, 'window-1');
+  assert.equal(launched.launch.time, launched.elapsed);
+  assert.equal(tick(launched, 5000).phase, 'ascent');
+});
+
+test('debug jump builds valid, labelled prerequisite state for every stage', () => {
+  assert.equal(MISSION_STAGES.length, 7);
+  for (const stage of MISSION_STAGES) {
+    const state = send(createInitialState(), 'DEBUG_JUMP', { stage: stage.id, siteName: 'Test site' });
+    assert.equal(state.phase, stage.id);
+    assert.deepEqual(state, send(createInitialState(), 'DEBUG_JUMP', { stage: stage.id, siteName: 'Test site' }));
+    if (stage.id === 'planning') { assert.equal(state.missionPlan, null); continue; }
+    assert.equal(state.missionPlan.debug, true);
+    assert.ok(state.missionPlan.selectedWindow.durationMs > 0);
+    assert.ok(state.debug.generated.length >= 1);
+    assert.equal(state.paused, true);
+    assert.equal(tick(send(state, 'TOGGLE_PAUSE'), 1).phase, stage.id);
+  }
+  // Each jumped-into stage can be played on with the normal actions.
+  let state = send(createInitialState(), 'DEBUG_JUMP', { stage: 'launchpad' });
+  assert.equal(state.installedParts.length, ASSEMBLY_COMPONENTS.length);
+  assert.equal(send(state, 'EXTEND_PLATFORM').pad.platformExtended, true);
+  state = send(send(createInitialState(), 'DEBUG_JUMP', { stage: 'ascent' }), 'TOGGLE_PAUSE');
+  assert.equal(send(tick(state, 20), 'SEPARATE_FIRST_STAGE').ascent.separatedAt, 20);
+  state = send(send(createInitialState(), 'DEBUG_JUMP', { stage: 'transit' }), 'TOGGLE_PAUSE');
+  assert.equal(tick(state, 18).transit.questions[0].status, 'pending');
+  state = send(createInitialState(), 'DEBUG_JUMP', { stage: 'landing' });
+  assert.equal(send(send(state, 'SELECT_LANDING_ZONE', { zone: 'B' }), 'BEGIN_DESCENT').landing.descentStartedAt, state.elapsed);
+  state = send(createInitialState(), 'DEBUG_JUMP', { stage: 'lunar-operations' });
+  assert.equal(send(state, 'DEPLOY_ROVER', { siteName: 'x' }).lunarOps.roverDeployed, true);
+});
+
+test('debug jump keeps a real mission plan and real progress', () => {
+  let state = enterMission();
+  state = tick(state, 40);
+  state = send(state, 'DEBUG_JUMP', { stage: 'launchpad' });
+  assert.equal(state.missionPlan.debug, undefined);
+  assert.equal(state.missionPlan.siteId, 'malapert');
+  assert.equal(state.elapsed, 40);
+  assert.deepEqual(state.debug.generated, ['Completed vehicle assembly']);
+  assert.equal(getStageIndex(state.phase), 2);
+  assert.equal(send(state, 'RESTART').debug, null);
 });
 
 test('ascent cues lead to persisted transit questions, landing, and a completed lunar survey', () => {
-  let state = tick(preparedAtFirstWindow(), LAUNCH_WINDOWS[0].openAt - 35);
+  let state = tick(preparedOnPad(), WEATHER_HOLD_SECONDS);
+  state = send(state, 'ASSESS_WEATHER');
+  state = send(state, 'CHECK_PAD_ITEM', { key: 'site' });
   state = send(state, 'START_COUNTDOWN');
   state = tick(state, 12);
   state = send(state, 'LAUNCH', { siteName: 'Malapert' });
