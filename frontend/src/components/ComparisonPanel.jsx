@@ -16,12 +16,12 @@ const ComparisonPanel = ({ selectedDate, onClose }) => {
         </div>
         <button type="button" onClick={onClose} aria-label="Close comparison">×</button>
       </div>
-      <p className="comparison-panel-note">Prototype comparison uses the current simplified ephemeris. LOLA terrain and JPL Horizons data require the backend.</p>
+      <p className="comparison-panel-note">Sun and Earth positions from JPL Horizons, skylines from LOLA terrain, over this 29.53-day lunar day. Geometric visibility only.</p>
       <div className="comparison-grid">
         {landingSites.map((site) => {
           const sun = getVisibilitySummary(selectedDate, calculateSunPosition, site.latitude, site.longitude);
           const earth = getVisibilitySummary(selectedDate, calculateEarthPosition, site.latitude, site.longitude);
-          const bestOverlap = getBestOverlap(site.latitude, site.longitude);
+          const bestOverlap = getBestOverlap(site.latitude, site.longitude, selectedDate);
           return (
             <section key={site.name} className="comparison-card">
               <strong>{site.name}</strong>

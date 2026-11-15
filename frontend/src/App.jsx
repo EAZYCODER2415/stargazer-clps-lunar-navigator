@@ -152,19 +152,15 @@ function App() {
   const handleStep = (hours) => setClampedTime(new Date(time.getTime() + hours * 3600000));
 
   // Both searches stop at the end of the lunar day; null means no more rises or sets before then.
-  const nextSunTransition = findNextHorizonTransition(
-    time,
-    calculateSunPosition,
-    selectedSite.latitude,
-    selectedSite.longitude,
-    windowEnd
+  // They walk the ephemeris in half-hour steps, so they are redone only when the time or site changes,
+  // not every time the camera turns and this component re-renders.
+  const nextSunTransition = useMemo(
+    () => findNextHorizonTransition(time, calculateSunPosition, selectedSite.latitude, selectedSite.longitude, windowEnd),
+    [time, selectedSite, windowEnd]
   );
-  const nextEarthTransition = findNextHorizonTransition(
-    time,
-    calculateEarthPosition,
-    selectedSite.latitude,
-    selectedSite.longitude,
-    windowEnd
+  const nextEarthTransition = useMemo(
+    () => findNextHorizonTransition(time, calculateEarthPosition, selectedSite.latitude, selectedSite.longitude, windowEnd),
+    [time, selectedSite, windowEnd]
   );
   const sunSummary = useMemo(
     () => getVisibilitySummary(windowStart, calculateSunPosition, selectedSite.latitude, selectedSite.longitude),
@@ -183,18 +179,31 @@ function App() {
     [windowStart, selectedSite]
   );
   const bestWindow = useMemo(
-    () => getBestOverlap(selectedSite.latitude, selectedSite.longitude),
-    [selectedSite]
+    () => getBestOverlap(selectedSite.latitude, selectedSite.longitude, windowStart),
+    [selectedSite, windowStart]
   );
   const handleJumpTo = (target) => {
     if (target === 'best' && bestWindow) return setClampedTime(bestWindow.time);
     const transition = target === 'sun' ? nextSunTransition : nextEarthTransition;
     if (transition) setClampedTime(transition.time);
   };
-  const directRadioPossible = telemetry.isSunVisible && telemetry.isEarthVisible;
-  const verdict = directRadioPossible
-    ? 'Sun and Earth are visible. Array power and direct radio contact are available.'
-    : `Direct radio contact is impossible. Sun is ${telemetry.isSunVisible ? 'visible' : nextSunTransition ? `down and rises in ${Math.round(nextSunTransition.hours)} hours` : 'down for the rest of this lunar day'}; Earth is ${telemetry.isEarthVisible ? 'visible' : 'below the horizon'}.`;
+  // Radio contact depends on Earth being visible; power depends on the Sun. Four cases.
+  const sunReturns = nextSunTransition
+    ? `The Sun rises in ${Math.round(nextSunTransition.hours)} hours.`
+    : 'The Sun stays down for the rest of this lunar day.';
+  const earthReturns = nextEarthTransition
+    ? `Earth rises in ${Math.round(nextEarthTransition.hours)} hours.`
+    : 'Earth stays hidden for the rest of this lunar day.';
+  let verdict;
+  if (telemetry.isSunVisible && telemetry.isEarthVisible) {
+    verdict = 'Sun and Earth are both visible: solar power and direct radio contact are available.';
+  } else if (telemetry.isEarthVisible) {
+    verdict = `Earth is visible, so the direct radio link is open. The Sun is hidden, so there is no solar power. ${sunReturns}`;
+  } else if (telemetry.isSunVisible) {
+    verdict = `The Sun is visible, so there is solar power. Earth is hidden, so there is no direct radio contact. ${earthReturns}`;
+  } else {
+    verdict = `Neither the Sun nor Earth is visible: no solar power and no direct radio contact. ${sunReturns} ${earthReturns}`;
+  }
 
   return (
     <div className="app">
@@ -288,6 +297,8 @@ function App() {
               onJumpTo={handleJumpTo}
               bestWindow={bestWindow}
               telemetry={telemetry}
+              viewMode={viewMode}
+              cameraInfo={cameraInfo}
             />
             {showComparison && (
               <ComparisonPanel selectedSite={selectedSite} selectedDate={windowStart} onClose={() => setShowComparison(false)} />
