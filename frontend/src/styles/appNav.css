@@ -1,0 +1,112 @@
+/* The way back to the home page from the 3D app, and the bar shown in casual mode (#casual). */
+
+.mission-header-home,
+.casual-bar-home {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.85rem;
+  padding: 0 0.5rem;
+  border: 1px solid rgba(71, 85, 105, 0.58);
+  border-radius: 0.35rem;
+  background: rgba(15, 23, 42, 0.62);
+  color: #cbd5e1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.mission-header-home svg,
+.casual-bar-home svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.mission-header-home:hover,
+.casual-bar-home:hover {
+  border-color: rgba(245, 158, 11, 0.48);
+  background: rgba(180, 83, 9, 0.16);
+  color: #fbbf24;
+}
+
+.mission-header-home:focus-visible,
+.casual-bar a:focus-visible,
+.casual-bar button:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+/* Casual mode: only this bar sits over the scene. The bar itself lets the mouse through,
+   so dragging along the top of the view still looks around. */
+.overlay-container > .casual-bar {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  left: 0.75rem;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  pointer-events: none;
+}
+
+.casual-bar > * {
+  pointer-events: auto;
+}
+
+.casual-bar-home {
+  height: 2.2rem;
+  background: rgba(5, 9, 17, 0.86);
+  backdrop-filter: blur(10px);
+}
+
+.casual-bar-note {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  border-radius: 0.35rem;
+  background: rgba(5, 9, 17, 0.72);
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+}
+
+.casual-bar-tools {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.2rem;
+  margin-left: auto;
+  padding: 0 0.9rem;
+  border: 1px solid rgba(248, 250, 252, 0.78);
+  border-radius: 0.35rem;
+  background: rgba(180, 83, 9, 0.9);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.casual-bar-tools svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.casual-bar-tools:hover {
+  background: #b45309;
+}
+
+@media (max-width: 640px) {
+  .casual-bar-note {
+    display: none;
+  }
+}

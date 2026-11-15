@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown, CircleQuestionMark, RotateCcw } from 'lucide-react';
+import { ChevronDown, CircleQuestionMark, House, RotateCcw } from 'lucide-react';
 import { calculateEarthPosition, calculateSunPosition, clearanceOf } from '../utils/ephemerisRuntime';
 import landingSites from '../data/landingSites.json';
+import { goHome } from '../routes';
 
 const Header = ({
   time,
@@ -39,6 +40,10 @@ const Header = ({
 
   return (
     <header className="mission-header">
+      <a className="mission-header-home" href="/" onClick={goHome} title="Back to the Stargazer home page">
+        <House aria-hidden="true" />
+        Home
+      </a>
       <div className="mission-header-brand">
         <div>
           <h1>Stargazer</h1>
