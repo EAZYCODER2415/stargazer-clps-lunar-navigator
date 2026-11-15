@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSEMBLY_COMPONENTS, GAME_SPEEDS, MISSION_STAGES, WEATHER_HOLD_SECONDS, createInitialState, getLaunchReadiness, getStageIndex, getWeather, reducer } from './gameEngine.js';
+import { ASSEMBLY_COMPONENTS, GAME_SPEEDS, MISSION_STAGES, WEATHER_HOLD_SECONDS, createInitialState, getCorridorStatus, getLaunchReadiness, getPadProcedure, getStageIndex, getWeather, reducer } from './gameEngine.js';
 
 const send = (state, type, fields = {}) => reducer(state, { type, ...fields });
 const tick = (state, delta) => send(state, 'TICK', { delta });
@@ -15,6 +15,11 @@ function testPlan() {
 function enterMission() {
   let state = send(createInitialState(), 'COMMIT_MISSION_PLAN', { plan: testPlan() });
   state = send(state, 'BEGIN_BRIEFING');
+  return state;
+}
+
+function clearCorridor(state) {
+  for (const obstacle of state.pad.corridor.obstacles) state = send(state, 'RELEASE_OBSTACLE', { id: obstacle.id, x: 0.95, y: obstacle.y });
   return state;
 }
 
@@ -93,6 +98,72 @@ test('assembly requires matching sockets and persists through pad preparation', 
   assert.equal(state.installedParts.length, ASSEMBLY_COMPONENTS.length);
 });
 
+test('pad procedure status follows pad state, with feedback for attempts out of order', () => {
+  let state = enterMission();
+  for (const part of ASSEMBLY_COMPONENTS) state = send(state, 'INSTALL_PART', { partId: part.id, slotId: part.slot });
+  state = send(state, 'PROCEED_TO_PAD');
+  const statuses = () => getPadProcedure(state).slice(0, 6).map((step) => step.status);
+  assert.deepEqual(statuses(), ['pending', 'pending', 'pending', 'pending', 'pending', 'pending']);
+  assert.equal(getPadProcedure(state)[0].next, true);
+  state = send(state, 'TOGGLE_PROPELLANT_LINE', { line: 'fuel' });
+  assert.equal(state.pad.fuelConnected, false);
+  assert.match(state.pad.feedback, /Extend the access platform/);
+  state = send(state, 'RETRACT_PLATFORM');
+  assert.equal(state.pad.platformRetracted, false);
+  state = send(state, 'EXTEND_PLATFORM');
+  state = send(state, 'TOGGLE_PROPELLANT_LINE', { line: 'fuel' });
+  assert.deepEqual(statuses(), ['done', 'active', 'pending', 'pending', 'pending', 'pending']);
+  state = send(state, 'START_PROPELLANT_LOADING');
+  assert.equal(state.pad.propellantStartedAt, null);
+  assert.match(state.pad.feedback, /valve stays shut/);
+  state = send(state, 'PAD_FEEDBACK', { message: 'Wrong port.' });
+  assert.equal(state.pad.feedback, 'Wrong port.');
+  state = send(state, 'TOGGLE_PROPELLANT_LINE', { line: 'oxidizer' });
+  state = send(state, 'START_PROPELLANT_LOADING');
+  state = send(state, 'CHECK_PAD_ITEM', { key: 'vehicle' });
+  assert.equal(state.pad.checks.vehicle, false);
+  state = send(state, 'CHECK_PAD_ITEM', { key: 'spacecraft' });
+  assert.deepEqual(statuses(), ['done', 'done', 'active', 'active', 'pending', 'pending']);
+  state = send(state, 'SWITCH_ONBOARD_POWER');
+  assert.equal(state.pad.onboardPower, false);
+  state = tick(state, 35);
+  state = send(state, 'CHECK_PAD_ITEM', { key: 'vehicle' });
+  state = send(state, 'RETRACT_PLATFORM');
+  state = send(state, 'SWITCH_ONBOARD_POWER');
+  assert.deepEqual(statuses(), ['done', 'done', 'done', 'done', 'done', 'done']);
+  assert.deepEqual(getLaunchReadiness(state).go, [true, true, false]);
+});
+
+test('corridor obstacles only clear past a clearance line, and RANGE CLEAR needs weather too', () => {
+  let state = preparedOnPad();
+  const start = getCorridorStatus(state);
+  assert.equal(start.total, 5);
+  assert.equal(start.remaining, 5);
+  assert.deepEqual(state.pad.corridor, send(send(createInitialState(), 'DEBUG_JUMP', { stage: 'launchpad' }), 'TOGGLE_PAUSE').pad.corridor);
+  assert.equal(getPadProcedure(state)[6].status, 'pending');
+  // Released inside the corridor, or short of the line: moved but not cleared.
+  state = send(state, 'RELEASE_OBSTACLE', { id: 'bird-1', x: 0.5, y: 0.4 });
+  state = send(state, 'RELEASE_OBSTACLE', { id: 'drone-1', x: 0.5 + 0.33, y: 0.6 });
+  assert.equal(getCorridorStatus(state).remaining, 5);
+  assert.match(state.pad.corridor.feedback, /still inside the clearance lines/);
+  assert.equal(state.pad.corridor.obstacles.find((item) => item.id === 'bird-1').y, 0.4);
+  // Unknown obstacles and bad coordinates do nothing.
+  assert.equal(send(state, 'RELEASE_OBSTACLE', { id: 'nope', x: 0.99, y: 0.5 }), state);
+  assert.equal(send(state, 'RELEASE_OBSTACLE', { id: 'bird-1', x: NaN, y: 0.5 }), state);
+  state = send(state, 'RELEASE_OBSTACLE', { id: 'bird-1', x: 0.1, y: 0.4 });
+  assert.equal(getCorridorStatus(state).remaining, 4);
+  assert.equal(getPadProcedure(state)[6].status, 'active');
+  assert.equal(send(state, 'RELEASE_OBSTACLE', { id: 'bird-1', x: 0.5, y: 0.4 }), state);
+  state = clearCorridor(state);
+  assert.equal(getCorridorStatus(state).obstaclesClear, true);
+  assert.equal(getCorridorStatus(state).rangeClear, false);
+  assert.deepEqual(getLaunchReadiness(state).go, [true, true, false]);
+  state = send(tick(state, WEATHER_HOLD_SECONDS), 'ASSESS_WEATHER');
+  assert.equal(getCorridorStatus(state).rangeClear, true);
+  assert.equal(getPadProcedure(state)[6].status, 'done');
+  assert.deepEqual(getLaunchReadiness(state).go, [true, true, true]);
+});
+
 test('weather is one fixed condition that clears on the mission clock and must be inspected', () => {
   let state = preparedOnPad();
   assert.equal(state.elapsed, 35);
@@ -100,23 +171,24 @@ test('weather is one fixed condition that clears on the mission clock and must b
   assert.deepEqual(getLaunchReadiness(state).go, [true, true, false]);
   state = send(state, 'ASSESS_WEATHER');
   assert.equal(state.pad.weatherAssessed, false);
-  assert.match(state.pad.feedback, /still above limits/);
-  state = send(state, 'CHECK_PAD_ITEM', { key: 'site' });
-  assert.equal(state.pad.checks.site, false);
+  assert.match(state.pad.corridor.feedback, /still above limits/);
+  state = clearCorridor(state);
+  assert.equal(getCorridorStatus(state).obstaclesClear, true);
+  assert.equal(getCorridorStatus(state).rangeClear, false);
   assert.equal(send(state, 'START_COUNTDOWN').phase, 'launchpad');
   state = tick(state, WEATHER_HOLD_SECONDS - 35);
   assert.equal(getWeather(state).clear, true);
   assert.equal(getLaunchReadiness(state).weatherReady, false);
   state = send(state, 'ASSESS_WEATHER');
   assert.equal(state.pad.weatherAssessed, true);
-  state = send(state, 'CHECK_PAD_ITEM', { key: 'site' });
+  state = clearCorridor(state);
   assert.deepEqual(getLaunchReadiness(state).go, [true, true, true]);
 });
 
 test('launch needs all three lights before the preparation deadline, with no launch windows', () => {
   let state = tick(preparedOnPad(), WEATHER_HOLD_SECONDS);
   state = send(state, 'ASSESS_WEATHER');
-  state = send(state, 'CHECK_PAD_ITEM', { key: 'site' });
+  state = clearCorridor(state);
   assert.equal(getLaunchReadiness(state).canLaunch, true);
   const late = tick(state, 1710);
   assert.equal(late.phase, 'no-launch');
@@ -173,7 +245,7 @@ test('debug jump keeps a real mission plan and real progress', () => {
 test('ascent cues lead to persisted transit questions, landing, and a completed lunar survey', () => {
   let state = tick(preparedOnPad(), WEATHER_HOLD_SECONDS);
   state = send(state, 'ASSESS_WEATHER');
-  state = send(state, 'CHECK_PAD_ITEM', { key: 'site' });
+  state = clearCorridor(state);
   state = send(state, 'START_COUNTDOWN');
   state = tick(state, 12);
   state = send(state, 'LAUNCH', { siteName: 'Malapert' });
