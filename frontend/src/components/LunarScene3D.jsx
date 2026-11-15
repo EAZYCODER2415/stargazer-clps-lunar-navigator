@@ -41,12 +41,32 @@ const FREE_VIEW_EYE_HEIGHT = 2;    // the eye never gets closer to the ground th
 const FREE_VIEW_CEILING = 500;     // ... and never further above it than this
 const FREE_VIEW_KEEP_OUT = 3.5;    // do not fly through the lander
 const FREE_VIEW_START_DISTANCE = 16;
-const FREE_VIEW_BASE_SPEED = 25;   // metres per second beside the lander
-const FREE_VIEW_SPEED_PER_METRE = 0.156;   // faster further out, so the 2 km range does not take minutes to cross
-const FREE_VIEW_MAX_SPEED = 100;      // before the Shift boost
-const FREE_VIEW_BOOST = 4;         // Shift
+const FREE_VIEW_BASE_SPEED = 60;   // metres per second on the ground beside the lander
+const FREE_VIEW_SPEED_PER_METRE_UP = 0.5;     // faster the higher you fly, where the ground appears to crawl past
+const FREE_VIEW_SPEED_PER_METRE_OUT = 0.05;   // and a little faster further out; speed never drops with distance
+const FREE_VIEW_MAX_SPEED = 350;   // before the Shift boost
+const FREE_VIEW_BOOST = 3;         // Shift
+const FREE_VIEW_TOP_SPEED = 600;   // overall limit, Shift included
+// Mouse look in Free View, in degrees per pixel of mouse travel at the default 62 degree view and the
+// default sensitivity. The sensitivity slider (0.5 to 2.5, default 1.8) halves this at its lowest
+// setting and doubles it at its highest: a 4x spread. Zooming in slows it in proportion.
+const FREE_LOOK_DEG_PER_PIXEL = 0.15;
+const LOOK_SENSITIVITY_MIN = 0.5;
+const LOOK_SENSITIVITY_MAX = 2.5;
+const DEFAULT_FOV = 62;
+// Free View keeps its own look angles and only reports them to the rest of the app this often
+// (the compass needs them). Reporting every mouse event re-rendered the whole interface each time.
+const FREE_LOOK_SYNC_MS = 200;
+const MAX_FRAME_SECONDS = 0.5;     // movement uses real elapsed time; only a stall longer than this is cut short
 const FREE_VIEW_PAD_STEP = 3;      // metres per click of the on-screen pad
 const DEFAULT_LOOK_SENSITIVITY = 1.8;
+const freeLookMultiplier = (sensitivity) => {
+  const span = sensitivity < DEFAULT_LOOK_SENSITIVITY
+    ? DEFAULT_LOOK_SENSITIVITY - LOOK_SENSITIVITY_MIN
+    : LOOK_SENSITIVITY_MAX - DEFAULT_LOOK_SENSITIVITY;
+  return 2 ** Math.max(-1, Math.min(1, (sensitivity - DEFAULT_LOOK_SENSITIVITY) / span));
+};
+const clampLookPitch = (pitch) => Math.max(-60, Math.min(80, pitch));     // the same limits App.jsx applies
 const MOVE_KEYS = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd']);
 
 // Real angular radii: Sun 0.27°, Earth 0.95° as seen from the Moon. Drawn larger so they read on screen.
@@ -826,6 +846,23 @@ const LunarScene3D = ({
     // Free View only: lock the pointer to the canvas, as a first-person game does. The browser
     // releases it on Esc; we release it when Free View is left.
     let pointerLocked = false;
+    // Free View look angles live here, not in React state: the mouse turns the camera directly and
+    // the render loop draws it. `pending` is what the app has not been told yet; `app` is what it
+    // has been told, so a change made elsewhere (Look at Sun, reset) can be recognised and adopted.
+    const look = { yaw: 0, pitch: 0, pendingYaw: 0, pendingPitch: 0, appYaw: 0, appPitch: 0, awaitingUntil: 0, lastSyncAt: 0 };
+    const turnFreeLook = (yawDegrees, pitchDegrees) => {
+      const pitch = clampLookPitch(look.pitch + pitchDegrees);
+      look.pendingYaw += yawDegrees; look.pendingPitch += pitch - look.pitch;
+      look.yaw += yawDegrees; look.pitch = pitch;
+    };
+    const syncFreeLook = (now) => {
+      look.lastSyncAt = now;
+      if (!look.pendingYaw && !look.pendingPitch) return;
+      propsRef.current.onLookDrag?.(look.pendingYaw, look.pendingPitch);
+      look.appYaw += look.pendingYaw; look.appPitch = clampLookPitch(look.appPitch + look.pendingPitch);
+      look.pendingYaw = 0; look.pendingPitch = 0;
+      look.awaitingUntil = now + 1500;      // until the app's copy catches up, ours is the one to trust
+    };
     const lockPointer = () => {
       if (propsRef.current.viewMode !== 'free' || pointerLocked || !canvas.requestPointerLock) return;
       try {
@@ -835,6 +872,7 @@ const LunarScene3D = ({
     };
     const onPointerLockChange = () => {
       pointerLocked = document.pointerLockElement === canvas;
+      if (!pointerLocked && propsRef.current.viewMode === 'free') syncFreeLook(performance.now());
       setIsPointerLocked(pointerLocked);
       drag.active = false;
       canvas.style.cursor = pointerLocked ? 'none' : 'grab';
@@ -857,18 +895,18 @@ const LunarScene3D = ({
       if (pointerLocked) {
         // Mouse look: moving the mouse right turns right, moving it up looks up.
         const { invertLook: inverted, lookSensitivity: sensitivity } = propsRef.current;
-        const degreesPerPixel = (camera.fov / container.clientHeight) * (sensitivity / DEFAULT_LOOK_SENSITIVITY) * (inverted ? -1 : 1);
+        const degreesPerPixel = FREE_LOOK_DEG_PER_PIXEL * (camera.fov / DEFAULT_FOV) * freeLookMultiplier(sensitivity) * (inverted ? -1 : 1);
         const limit = (value) => Math.max(-150, Math.min(150, value));      // browsers can report one huge jump as the lock starts
-        propsRef.current.onLookDrag?.(-limit(event.movementX) * degreesPerPixel, -limit(event.movementY) * degreesPerPixel);
+        turnFreeLook(-limit(event.movementX) * degreesPerPixel, -limit(event.movementY) * degreesPerPixel);
         return;
       }
       if (drag.active) {
         const degreesPerPixel = camera.fov / container.clientHeight;
         const direction = propsRef.current.invertLook ? -1 : 1;
-        propsRef.current.onLookDrag?.(
-          (event.clientX - drag.x) * degreesPerPixel * direction,
-          (event.clientY - drag.y) * degreesPerPixel * direction
-        );
+        const turnYaw = (event.clientX - drag.x) * degreesPerPixel * direction;
+        const turnPitch = (event.clientY - drag.y) * degreesPerPixel * direction;
+        if (propsRef.current.viewMode === 'free') turnFreeLook(turnYaw, turnPitch);     // drag fallback when the lock is refused
+        else propsRef.current.onLookDrag?.(turnYaw, turnPitch);
         drag.x = event.clientX; drag.y = event.clientY;
         return;
       }
@@ -922,9 +960,10 @@ const LunarScene3D = ({
     let frame;
     const render = () => {
       frame = requestAnimationFrame(render);
-      if (document.hidden) return;
+      if (document.hidden) { lastFrameAt = performance.now(); return; }     // time spent in a hidden tab is not flown
       const now = performance.now();
-      const deltaSeconds = Math.min(0.1, (now - lastFrameAt) / 1000);
+      // Real elapsed time, so a low frame rate does not slow the flight.
+      const deltaSeconds = Math.min(MAX_FRAME_SECONDS, (now - lastFrameAt) / 1000);
       lastFrameAt = now;
       frameCount += 1;
       if (now - fpsWindowStart >= 1000) {
@@ -932,7 +971,7 @@ const LunarScene3D = ({
         frameCount = 0; fpsWindowStart = now;
       }
       const stage = stageRef.current;
-      const { viewMode: mode, cameraYaw: yaw, cameraPitch: pitch } = propsRef.current;
+      const { viewMode: mode, cameraYaw: appYaw, cameraPitch: appPitch } = propsRef.current;
       const site = siteRef.current;
       const groundAt = (x, z) => (site ? site.terrain.heightAt(x, z) : 0);
       const moves = propsRef.current.freeMoveRef?.current;
@@ -943,9 +982,13 @@ const LunarScene3D = ({
           const side = (stage.keyLightAzimuth + 38) * DEG;
           const x = Math.sin(side) * FREE_VIEW_START_DISTANCE; const z = -Math.cos(side) * FREE_VIEW_START_DISTANCE;
           camera.position.set(x, groundAt(x, z) + FREE_VIEW_EYE_HEIGHT, z);
-          propsRef.current.onLookDrag?.(Math.atan2(x, z) / DEG - yaw, -3 - pitch);
+          look.yaw = Math.atan2(x, z) / DEG; look.pitch = -3;
+          look.appYaw = appYaw; look.appPitch = appPitch;
+          look.pendingYaw = look.yaw - appYaw; look.pendingPitch = look.pitch - appPitch;
+          syncFreeLook(now);
         } else {
           camera.position.set(0, EYE_Y, 0);
+          syncFreeLook(now);        // hand the final look direction back to the app
           if (document.pointerLockElement === canvas) document.exitPointerLock();
         }
         if (moves) { moves.stepForward = 0; moves.stepRight = 0; }
@@ -953,6 +996,20 @@ const LunarScene3D = ({
         canvas.style.cursor = 'grab';
         sensorHead.visible = mode === 'free';   // don't put the sensor inside the POV camera
       }
+      // Which look angles to draw with. In Free View: our own, unless the app's copy was changed from
+      // outside (Look at Sun, reset), in which case adopt it. In POV: the app's, exactly as before
+      // (for a moment after leaving Free View ours are used until the app has caught up).
+      const appInSync = Math.abs(appYaw - look.appYaw) < 1e-4 && Math.abs(appPitch - look.appPitch) < 1e-4;
+      if (appInSync) look.awaitingUntil = 0;
+      else if (mode === 'free' && now > look.awaitingUntil) {
+        look.yaw = appYaw; look.pitch = appPitch; look.appYaw = appYaw; look.appPitch = appPitch;
+        look.pendingYaw = 0; look.pendingPitch = 0;
+      }
+      const useOwnLook = mode === 'free' || (!appInSync && now < look.awaitingUntil);
+      const yaw = useOwnLook ? look.yaw : appYaw;
+      const pitch = useOwnLook ? look.pitch : appPitch;
+      const syncDue = mode === 'free' && now - look.lastSyncAt >= FREE_LOOK_SYNC_MS;
+      if (syncDue) syncFreeLook(now);
       if (mode === 'free') {
         // Flying: W / Up moves along the look direction (up and down included), A / D strafes.
         // App.jsx reports which keys are held; the speed is applied here, once per frame, so it is smooth.
@@ -961,8 +1018,12 @@ const LunarScene3D = ({
         const aheadX = -Math.sin(heading) * Math.cos(tilt); const aheadY = Math.sin(tilt); const aheadZ = -Math.cos(heading) * Math.cos(tilt);
         const sideX = Math.cos(heading); const sideZ = -Math.sin(heading);
         const held = moves || { forward: 0, right: 0, boost: false, stepForward: 0, stepRight: 0 };
-        const speed = Math.min(FREE_VIEW_MAX_SPEED, FREE_VIEW_BASE_SPEED + FREE_VIEW_SPEED_PER_METRE * Math.hypot(position.x, position.z))
-          * (held.boost ? FREE_VIEW_BOOST : 1);
+        const heightNow = Math.max(0, position.y - groundAt(position.x, position.z));
+        const cruise = Math.min(
+          FREE_VIEW_MAX_SPEED,
+          FREE_VIEW_BASE_SPEED + FREE_VIEW_SPEED_PER_METRE_UP * heightNow + FREE_VIEW_SPEED_PER_METRE_OUT * Math.hypot(position.x, position.z)
+        );
+        const speed = Math.min(FREE_VIEW_TOP_SPEED, cruise * (held.boost ? FREE_VIEW_BOOST : 1));
         flightTarget.set(
           (aheadX * held.forward + sideX * held.right) * speed,
           aheadY * held.forward * speed,
@@ -1004,7 +1065,9 @@ const LunarScene3D = ({
 
       camera.getWorldDirection(forward);
       const centerAz = (Math.atan2(forward.x, -forward.z) / DEG + 360) % 360;
-      if (now - lastInfo.at > 120 && (Math.abs(centerAz - lastInfo.centerAz) > 0.05 || camera.fov !== lastInfo.fov)) {
+      // The compass reading. In Free View it is sent together with the look angles (5 times a second at most).
+      const infoDue = mode === 'free' ? syncDue : now - lastInfo.at > 120;
+      if (infoDue && (Math.abs(centerAz - lastInfo.centerAz) > 0.05 || camera.fov !== lastInfo.fov)) {
         lastInfo = { centerAz, fov: camera.fov, at: now };
         propsRef.current.onCameraInfo?.({ centerAz, fov: camera.fov });
       }
