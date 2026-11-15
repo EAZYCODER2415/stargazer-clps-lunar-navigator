@@ -10,7 +10,7 @@
   background: rgba(15, 23, 42, 0.72);
   color: #94a3b8;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.52rem;
+  font-size: 0.68rem;
   letter-spacing: 0.05em;
   pointer-events: none;
 }
@@ -42,7 +42,21 @@
 }
 
 .camera-fps-readout {
-  font-size: 0.66rem;
+  font-size: 0.72rem;
+}
+
+/* Free View crosshair: shown while the mouse is captured, marks where "forward" points */
+.scene-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  transform: translate(-50%, -50%);
+  color: rgba(248, 250, 252, 0.9);
+  font: 300 1.2rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  user-select: none;
 }
 
 .scene-hover-tip {
@@ -119,7 +133,7 @@
 
 .sky-compass-cardinal {
   fill: #cbd5e1;
-  font-size: 6.5px;
+  font-size: 7.8px;      /* SVG units: about 12.5 px on screen at the smallest compass size */
   font-weight: 700;
   text-anchor: middle;
 }

@@ -1,0 +1,4 @@
+# The built database is a generated file. Rebuild it with: python backend/scripts/build_db.py --rerun-cost
+*.db
+*.db-journal
+*.db.tmp-*
